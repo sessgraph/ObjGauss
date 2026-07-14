@@ -7,10 +7,10 @@
 
 ### 当前事实
 
-- 当前阶段：Demo A 的 `PR-00` contract 切片；Stage-0 与 `PR-00` 的准确动态状态以
-  `docs/PROJECT_PLAN.md` 为准。
-- 当前主要交付物：唯一机器 contract、确定性 synthetic fixture producer、独立 evaluator、
-  Web 证据页、机器报告，以及与其一致的 PRD、计划、资源台账和协作规则。
+- 当前阶段：Demo A 的 PR-01 严格成对干预里程碑；内部按 `PR-01A`–`PR-01F` 推进，独立
+  audit 必须先于正式 cohort。准确动态状态以 `docs/state/` 为准。
+- 当前主要交付物：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract family、
+  隔离 simulator runtime、原子 writer、独立 audit、无 RGB 五联 Demo 和机器报告。
 - 拟议研究方向：对象中心、动作条件的 Gaussian 世界模型；方向、完成层级和阈值仍是
   working_assumption，只有 Owner 明确确认后才是 decision。
 - Owner 已确认实现路径按“一个 PR 只引入一个可证伪假设”拆分，并由 PR-04 实验裁决
@@ -23,12 +23,26 @@
   声明边界以 REFERENCES.md 为准，该授权不延伸到训练数据或其他 3DGS 资产。
 - Owner 已决定新项目当前保持私有并按 all rights reserved 管理；对外发布前必须重新做
   许可证决策。该决定不授权复制旧归档中的任何实现。
-- Owner 已决定 `PR-00` 以 JSON Schema Draft 2020-12 作为唯一机器 contract 源；当前唯一
-  schema 是 `contracts/objgauss/0.1.0/episode.schema.json`，Web、未来 Python 和其他工具只能
-  作为 consumer。
+- Owner 已决定以 JSON Schema Draft 2020-12 作为机器 contract 源。`0.1.0` episode 只属于
+  PR-00 synthetic audit；PR-01 使用 `0.2.0` episode、experiment、attempt 和 invariance report
+  四份唯一 schema。Consumer 必须按精确 `schema_version + contract_kind` 分派。
 - Owner 已批准 `PR-00` 使用 JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild 和 `node:test`；
   不引入服务端框架。精确依赖版本由实现时的 lockfile 固定；该决定不冻结未来 Python/训练
   技术栈。
+- Owner 已批准 PR-01 生产仿真边界：固定 pilot 已验证的 CPython/ManiSkill/SAPIEN/Torch 版本，
+  作为独立 `sim` optional extra，只用于离线 primitive episode 生成；允许 adapter、原子 writer、
+  CLI、行为测试、真实 smoke 和 CI。禁止 runtime 网络、外部 asset、RGB/GPU renderer、训练、
+  模型、Gaussian dynamics 和机器人控制；独立 auditor 不得依赖 ManiSkill 或 writer 逻辑。
+- Owner 已决定 PR-01 Contract 使用 `0.2.0 + experiment manifest`：单 branch episode、完整
+  experiment、失败/retry attempt 与独立 invariance report 分账；`0.1.0` 字节冻结，不存在自动
+  `0.1.0 -> 0.2.0` 迁移，Schema 不固定具体 fixture ID。
+- Owner 已决定 PR-01 Demo 使用无 RGB 五联状态回放：只消费已审计 episode，以 Canvas/SVG
+  显示对象、动作、轨迹、contact 与 settling；浏览器不运行 simulator，不使用 CDN、外部资产
+  或 GPU。Machine report 是事实源，Demo 只解释证据。
+- PR-01 最终 lineage 不在冻结 spec 中硬编码提交 SHA；spec 只记录
+  `runtime-current-clean-git-head` 策略，生成进程注入当前 HEAD。`accept-pr01`、Delivery builder
+  与 verifier 必须拒绝 staged、tracked 或非 ignored untracked 改动；只有 clean checkout 才能
+  生成绑定最终 commit 的验收证据。
 - Owner 已批准以 GitHub Actions 作为 `PR-00` CI，并以 `npm run check` 作为本地与 CI 的唯一
   验收入口；PR 和 `main` 均使用 Node `24.18.0`、`npm ci`、contract audit、测试、Web build
   和语法检查。真实脚本、lockfile 与 workflow 已建立；该授权不包含 push、部署或发布。
@@ -72,7 +86,8 @@
   贡献者还能在本地打开沉浸式 Stage-0 页面，从环境内部环绕、平移、移动和缩放由 8,523 个
   splat 组成的确定性 synthetic Gaussian world，并可切换到通过固定哈希校验的
   103,060-splat 外部审计样例；也能打开 `PR-00` Web 证据页，同步查看已验证 contract 的
-  RGB、对象、相机、坐标轴、轨迹和机器裁决。
+  RGB、对象、相机、坐标轴、轨迹和机器裁决；PR-01 最终验收后还能从已审计 formal episode
+  打开五联无 RGB 状态回放。
 - 长期目标用户、产品形态和首个对外成果仍待 Owner 在 PRD 评审中确认。
 
 ### 当前不变量
@@ -89,8 +104,8 @@
 
 ### 当前明确不做
 
-- 除已批准的 Stage-0 与 `PR-00` contract 切片外，不实现模型、服务、公共 API、持久化或
-  机器人控制。
+- 除已批准的 Stage-0、PR-00 与 PR-01A–F 严格 sibling evidence 里程碑外，不实现模型、服务、
+  公共 API、长期持久化或机器人控制。
 - 不把旧 M2、BOP、RBO、NeRF Lego 或 Hugging Face 结果当作新项目当前基线。
 - 不在 Identity Gate 之前扩展复杂因果头、diffusion、replay buffer 或自生成训练。
 - 不按“适配一个数据集”打包模型、评估和 Demo 等多个无法独立裁决的目标。
@@ -115,9 +130,9 @@
 | 候选数据、外部地址、归档资源、许可状态与历史负证据 | REFERENCES.md |
 | 当前实际文件与改动 | 文件系统、git status --short 和可复现命令结果 |
 | 稳定协作与授权规则 | 本文件 |
-| 公共机器 contract | contracts/objgauss/0.1.0/episode.schema.json |
+| 公共机器 contract | `contracts/objgauss/0.1.0/` 与 `contracts/objgauss/0.2.0/`；必须精确版本分派 |
 | 架构与 ADR | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00 contract 与验证栈 |
-| 已实现行为 | src/pr00/、viewer/、scripts/、tests/ 与可复现命令结果 |
+| 已实现行为 | src/pr00/、src/pr01/、sim/、viewer/、scripts/、tests/ 与可复现命令结果 |
 
 代码决定“现在实际发生什么”；Owner 已批准的 PRD、contract、task 和 ADR 决定“规范要求
 什么”；README 或状态摘要只是上述事实的投影。来源冲突时先复现和定位，不静默选择方便
@@ -126,7 +141,8 @@
 一个事实只保留一个权威来源：
 
 - 需求和声明门改 docs/PRD.md，计划只链接。
-- PR 队列和切片验收改 docs/PROJECT_PLAN.md，README 只链接。
+- 稳定 PR 依赖和切片验收改 docs/PROJECT_PLAN.md；动态队列、状态、风险和 inbox 改
+  docs/state/；README 只链接。
 - 数据、资产、归档和许可状态改 REFERENCES.md，其他文档不复制细节。
 - 稳定执行规则改本文件，动态进度不得写入本文件。
 
@@ -137,22 +153,31 @@
 | README.md | 当前阶段摘要和事实源入口 |
 | docs/PRD.md | 拟议产品/研究需求与声明门 |
 | docs/PROJECT_PLAN.md | 阶段依赖、PR 队列和评审清单 |
+| docs/state/ | 动态 PR 执行状态、项目状态、风险与开放事项 |
 | REFERENCES.md | 资源、外部地址、归档、许可和历史证据台账 |
 | AGENTS.md | 根级协作、授权、验证和安全规则 |
-| docs/adr/ | 已批准的长期技术取舍；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00 |
+| docs/adr/ | 已批准的长期技术取舍；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，ADR-003 覆盖 PR-01 |
 | contracts/objgauss/0.1.0/ | PR-00 唯一 JSON Schema contract；已发布版本不得原地修改 |
-| contracts/fixtures/ | 固定 fixture spec、producer identity 与预期 checksum manifest |
+| contracts/objgauss/0.2.0/ | PR-01 episode/experiment/attempt/invariance-report 四份 JSON Schema |
+| contracts/fixtures/ | 固定 fixture spec、正负例、producer identity 与预期 checksum manifest |
 | src/pr00/ | frame math、validator、producer、evaluator、verdict 与 browser consumer 源码 |
-| viewer/ | Stage-0 WebGL2 Gaussian 世界与 PR-00 同步 contract 证据页 |
-| scripts/ | PR-00 build/audit/syntax 命令与固定 Stage-0 预览获取脚本 |
-| tests/ | Stage-0 与 PR-00 的 Node 行为和负例测试 |
+| src/pr01/ | PR-01 contract dispatch 与独立 auditor；auditor 不得导入 simulator 或 writer |
+| sim/ | PR-01 隔离 Python package、精确 uv lock、程序化 primitive runtime、adapter、原子 writer 与行为测试；只供离线生成 |
+| viewer/ | Stage-0 WebGL2 Gaussian 世界、PR-00 同步 contract 证据页与 PR-01 无 RGB 五联回放源码 |
+| scripts/ | PR-00 build/audit/syntax、Stage-0 预览获取、RES-001/PR-01 source pilots 与 PR-01 clean-install gates |
+| tests/、sim/tests/ | Stage-0/PR-00/PR-01 contract、simulator runtime 与 writer 的行为和负例测试 |
 | generated/pr00/ | Git ignored 的确定性 episode、数组、报告与 browser bundle；不得手改或提交 |
+| generated/pr01b/ | Git ignored 的 canonical/reverse runtime smoke 报告；可重建、不得提交 |
+| generated/pr01c/ | Git ignored 的 golden group 与 writer 报告；可重建、不得提交 |
+| generated/pr01d/ | Git ignored 的独立 audit/mutation 输出；可重建、不得提交 |
+| generated/pr01e/ | Git ignored 的 preflight/formal cohort 与 audit 输出；可重建、不得提交 |
+| artifacts/pr01/ | Git ignored 的最终 Delivery 投影；只由 clean-checkout 验收生成，不得提交 |
 | package.json、package-lock.json、.node-version | PR-00 命令、精确依赖解析与 Node runtime 事实源 |
-| .github/workflows/pr00-check.yml | PR 与 main 的 PR-00 CI 门；不部署或发布 |
+| .github/workflows/ | PR-00 Node 门与 PR-01 runtime/writer/audit/cohort/delivery 门；不部署或发布 |
 | data/ | Git ignored 本地数据；不得提交 |
 | .git 中的归档标签 | 旧项目只读恢复点，不是当前源码目录 |
 
-当前没有模型包、adapter 目录或训练数据目录。未来训练技术栈确定后必须先更新本节，再创建
+当前没有模型包或训练数据目录。未来训练技术栈确定后必须先更新本节，再创建
 真实需要的目录；不要预建空结构或假想扩展点。
 
 ## 4. 当前权威命令
@@ -169,12 +194,23 @@
 | 运行时 | Node 24.18.0；版本源为 .node-version |
 | 安装/同步依赖 | npm ci |
 | 获取 Stage-0 固定预览 | bash scripts/fetch-gaussian-preview.sh |
-| 启动 Web 页面 | python3 -m http.server 8000 --bind 127.0.0.1；PR-00 打开 http://127.0.0.1:8000/viewer/?mode=contract，Stage-0 打开 /viewer/ |
+| 启动 Web 页面 | python3 -m http.server 8000 --bind 127.0.0.1；PR-00 打开 http://127.0.0.1:8000/viewer/?mode=contract，Stage-0 打开 /viewer/，PR-01 验收后打开 /artifacts/pr01/demo/ |
 | 行为与负例测试 | npm test |
 | 语法检查 | npm run syntax |
 | 构建确定性 fixture 与 Web consumer | npm run build |
 | contract/codegen/audit | npm run contract:audit |
 | 完整测试或 CI 等价门 | npm run check |
+| RES-001 snapshot pilot | `env -u MS_SKIP_ASSET_DOWNLOAD_PROMPT MS_ASSET_DIR="$PWD/data/res001/no-assets" XDG_CACHE_HOME="$PWD/data/res001/xdg-cache" MPLCONFIGDIR="$PWD/data/res001/mpl-cache" data/res001/venv-py310/bin/python scripts/res001_snapshot_pilot.py`；只使用 ignored 固定 runtime |
+| PR-01 primitive sibling action baseline | `env -u MS_SKIP_ASSET_DOWNLOAD_PROMPT MS_ASSET_DIR="$PWD/data/res001/no-assets" XDG_CACHE_HOME="$PWD/data/res001/xdg-cache" MPLCONFIGDIR="$PWD/data/res001/mpl-cache" data/res001/venv-py310/bin/python scripts/pr01_sibling_action_pilot.py --order canonical --output data/res001/evidence/sibling-action-pilot-run1.json`；预期先停在 `pending_repeat` |
+| PR-01 primitive sibling action repeat | 上一命令后运行 `env -u MS_SKIP_ASSET_DOWNLOAD_PROMPT MS_ASSET_DIR="$PWD/data/res001/no-assets" XDG_CACHE_HOME="$PWD/data/res001/xdg-cache" MPLCONFIGDIR="$PWD/data/res001/mpl-cache" data/res001/venv-py310/bin/python scripts/pr01_sibling_action_pilot.py --order reverse --compare data/res001/evidence/sibling-action-pilot-run1.json --output data/res001/evidence/sibling-action-pilot-run2.json`；只有稳定 evidence 相同且执行顺序相反才 `supported` |
+| PR-01A contract audit | `npm run contract:pr01a`；写入 ignored `generated/pr01a/contract-report.json` |
+| PR-01A contract tests | `node --test tests/pr01a-contracts.test.mjs`；同时由 `npm test` / `npm run check` 覆盖 |
+| PR-01B clean-install runtime gate | `./scripts/check-pr01b-runtime`；uv `0.11.17` 从 `sim/uv.lock` 创建全新临时 venv，外部依赖只装 wheel，随后在 offline/空资产门下运行测试和 canonical/reverse 五分支 smoke |
+| PR-01C clean-install writer gate | `./scripts/check-pr01c-writer`；在 PR-01B 相同隔离门下运行 writer 负例与 canonical/reverse 真实 golden group，并独立复核 raw artifacts |
+| PR-01D independent audit gate | `./scripts/check-pr01d-audit`；重新生成真实 golden group，由不依赖 simulator/writer 的 evaluator 重算 hard gates 并运行完整 mutation matrix |
+| PR-01E preflight gate | `./scripts/check-pr01e-preflight`；先复跑 PR-01D，再生成与正式 cohort 隔离的 12 groups / 60 episodes，独立审计并产出预算 freeze candidate |
+| PR-01E formal cohort gate | `./scripts/check-pr01e-cohort`；先复跑 preflight，再按冻结 split/预算生成 48 groups / 240 episodes 并独立审计 |
+| PR-01 完整本地验收 | `./scripts/accept-pr01`；要求 clean checkout，从锁定依赖、全库 Node 门、独立 runtime smoke、真实 writer、preflight/formal cohort、独立 audit 到无 RGB Demo/checksums，只有最终 delivery supported 才退出 0 |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。
@@ -215,8 +251,9 @@ docs/adr/0002-pr00-contract-stack.md；模型/训练技术栈确定后，后续 
 - 行为变化必须有行为级测试；无法自动化时提供固定输入、复现步骤和残余风险。
 - 不删除测试、skip、放宽断言、吞异常或擅自更新阈值/基线来制造通过。
 
-当前只扩大到 Owner 明确批准的 Stage-0 页面与 `PR-00` contract。除非 Owner 再次明确扩大
-范围，不得借该授权提前实现 adapter、模型或后续 PR。
+当前扩大到 Owner 明确批准的 Stage-0、PR-00 和 PR-01A–F sibling evidence 里程碑。可以依
+ADR-003 实现隔离 runtime、adapter/writer、独立 audit、正式 primitive cohort 和无 RGB Demo；
+不得借此实现 RGB/GPU renderer、模型、训练、Gaussian dynamics、外部数据或机器人控制。
 
 ## 7. 数据、Contract 与研究证据
 

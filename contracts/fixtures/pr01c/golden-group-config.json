@@ -1,0 +1,15 @@
+{
+  "config_version": "0.1.0",
+  "experiment_id": "pr01c-writer-fixture-v0",
+  "fixture_id": "pr01c-writer-golden-v0",
+  "group_id": "group-box-a-layout-a-start-a-seed-24071401",
+  "split": "fixture",
+  "object_spec_id": "box-a",
+  "layout_id": "layout-a",
+  "start_pose_id": "start-a",
+  "target_object_id": "target",
+  "reset_seed": 24071401,
+  "snapshot_id": "snapshot-pr01c-golden-a",
+  "source_commit_policy": "runtime-current-clean-git-head",
+  "asset_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

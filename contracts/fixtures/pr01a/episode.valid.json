@@ -1,0 +1,130 @@
+{
+  "schema_version": "0.2.0",
+  "contract_kind": "objgauss.episode",
+  "identity": {
+    "experiment_id": "pr01-fixture",
+    "fixture_id": "pr01a-golden-v0",
+    "group_id": "group-box-a-layout-a-start-a-seed-24071401",
+    "branch_id": "hold",
+    "episode_id": "episode-group-a-hold",
+    "attempt_id": "attempt-group-a-hold-1",
+    "split": "fixture"
+  },
+  "initialization": {
+    "snapshot_id": "snapshot-group-a",
+    "snapshot_sha256": "7112a99c777455b44593f22dfaa7f3c0f0a5ffce0cbc845f7e65a31972cb8be4",
+    "initial_state_sha256": "718fc8aadbf62e15579e601a19765d2d6c4ea59ef1a34c8c661310d104df5606",
+    "reset_seed": 24071401,
+    "rng_algorithm": "numpy.random.RandomState.MT19937",
+    "restored_rng_sha256": "244cb61c0fcc89370a3264fbc50cf14bface31ffa9b683a4f5764a7bb33135d3"
+  },
+  "intervention": {
+    "changed_variable": "/intervention/commanded_action",
+    "target_object_id": "target",
+    "commanded_action": {
+      "kind": "hold",
+      "vector_W_N": [0, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    "executed_action": {
+      "kind": "hold",
+      "vector_W_N": [0, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    "control_ledger": {
+      "application_mode": "force_at_center_of_mass",
+      "requested_steps": 10,
+      "applied_steps": 10,
+      "force_samples_sha256": "00a2f0ec73e31b2ccbbe2e38fd0f4a16fb81116aca0f16744c8b16f8f2e23c09"
+    }
+  },
+  "environment": {
+    "object_spec_id": "box-a",
+    "layout_id": "layout-a",
+    "start_pose_id": "start-a",
+    "target_object_id": "target",
+    "simulator": {
+      "name": "mani-skill",
+      "version": "3.0.1",
+      "physics_engine": "sapien-physx",
+      "physics_engine_version": "3.0.3",
+      "backend": "physx_cpu"
+    },
+    "physics": {
+      "gravity_W_m_s2": [0, 0, -9.81],
+      "static_friction": 0.5,
+      "dynamic_friction": 0.5,
+      "restitution": 0
+    },
+    "contact": {
+      "enabled": true,
+      "sample_frequency_hz": 100,
+      "trace_fields": [
+        "body_pair",
+        "position_W_m",
+        "normal_W",
+        "impulse_W_N_s",
+        "separation_m"
+      ]
+    },
+    "settling": {
+      "duration_s": 1,
+      "linear_speed_max_m_s": 0.01,
+      "angular_speed_max_rad_s": 0.01
+    },
+    "coordinate_convention": {
+      "id": "robotics-opencv-v1",
+      "world_handedness": "right",
+      "world_up": "+Z",
+      "length_unit": "meter",
+      "force_frame": "world",
+      "force_unit": "newton",
+      "time_unit": "second",
+      "quaternion_order": "wxyz"
+    }
+  },
+  "evidence": {
+    "trajectory": {
+      "uri": "dataset/group-a/hold/trajectory.json",
+      "media_type": "application/vnd.objgauss.trajectory+json",
+      "sha256": "13453780b5e548406cd13a05e37d6e71cd880fe713b519b4d66435b56e95de3d",
+      "byte_length": 4096,
+      "record_count": 111
+    },
+    "contact_ledger": {
+      "uri": "dataset/group-a/hold/contact-ledger.json",
+      "media_type": "application/vnd.objgauss.contact-ledger+json",
+      "sha256": "30b6ec3fab30c19d2cb06ef8ea37c1ee6938a6a23460a3eb4be0d3382f2d61e8",
+      "byte_length": 8192,
+      "record_count": 110
+    },
+    "terminal_state_sha256": "738160840f8e2230fbd33517f83bc25cac9b3f7777a58bb4e26a3a1e9cbde447",
+    "settling_result": {
+      "settled": true,
+      "evaluation_time_s": 1.1,
+      "final_linear_speed_m_s": 0,
+      "final_angular_speed_rad_s": 0
+    }
+  },
+  "provenance": {
+    "parent_snapshot_id": "snapshot-group-a",
+    "previous_attempt_id": {
+      "availability": "missing",
+      "reason": "not_applicable"
+    },
+    "source_gate_report_sha256": "7674028fed1825b2ffe85689a9ca3048bf10c317ec9402f159a86ff803736e61",
+    "source_commit": "b4107fa4fb2747294daf616a01bede8def99a378",
+    "source_tree_sha256": "d3bd16c9f882403e45f86a4568ca5bd7d2325c771d3fce30df53ddf413180533",
+    "config_sha256": "cc9ed16402a7b4a3eb3642d5d5f78f91d45979935b92a7029a968dccb33930fd",
+    "runtime_lock_sha256": "b0aac6dff475d8b1287583da185e17aa9c7b390d30ee535398fd54b618d39e67",
+    "asset_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "producer": {
+      "name": "objgauss.pr01-writer",
+      "version": "0.1.0"
+    }
+  }
+}

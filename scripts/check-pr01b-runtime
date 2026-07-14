@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_ROOT="$ROOT/sim"
+OUTPUT_ROOT="$ROOT/generated/pr01b"
+cd "$ROOT"
+
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/runtime.XXXXXX")"
+VENV="$WORK_ROOT/venv"
+ASSET_DIR="$WORK_ROOT/no-assets"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+mkdir "$ASSET_DIR"
+chmod 0555 "$ASSET_DIR"
+
+export UV_PROJECT_ENVIRONMENT="$VENV"
+uv sync \
+  --project "$SIM_ROOT" \
+  --frozen \
+  --extra runtime \
+  --no-dev \
+  --no-install-project \
+  --no-build
+uv sync \
+  --project "$SIM_ROOT" \
+  --frozen \
+  --extra runtime \
+  --no-dev
+
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export UV_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export MS_ASSET_DIR="$ASSET_DIR"
+unset MS_SKIP_ASSET_DOWNLOAD_PROMPT || true
+
+"$VENV/bin/python" -m unittest discover -s "$SIM_ROOT/tests" -p 'test_runtime.py'
+"$VENV/bin/python" -m unittest discover -s "$SIM_ROOT/tests" -p 'test_semantics.py'
+"$VENV/bin/objgauss-pr01-runtime"
+"$VENV/bin/objgauss-pr01-smoke" \
+  --order canonical \
+  --lock "$SIM_ROOT/uv.lock" \
+  --output "$OUTPUT_ROOT/canonical.json"
+"$VENV/bin/objgauss-pr01-smoke" \
+  --order reverse \
+  --lock "$SIM_ROOT/uv.lock" \
+  --compare "$OUTPUT_ROOT/canonical.json" \
+  --output "$OUTPUT_ROOT/reverse.json"
+
+"$VENV/bin/python" -c '
+import json
+from pathlib import Path
+
+report = json.loads(Path("generated/pr01b/reverse.json").read_text())
+if report["verdict"] != "supported":
+    raise SystemExit("PR-01B smoke did not support the runtime: %s" % report["verdict"])
+print(json.dumps({
+    "verdict": report["verdict"],
+    "evidence_sha256": report["evidence_sha256"],
+    "canonical_report": "generated/pr01b/canonical.json",
+    "reverse_report": "generated/pr01b/reverse.json",
+}, sort_keys=True))
+'

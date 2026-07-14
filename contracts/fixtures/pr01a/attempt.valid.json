@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.2.0",
+  "contract_kind": "objgauss.attempt",
+  "identity": {
+    "experiment_id": "pr01-fixture",
+    "group_id": "group-box-a-layout-a-start-a-seed-24071401",
+    "branch_id": "push-pos-x-weak",
+    "attempt_id": "attempt-group-a-push-pos-x-weak-1",
+    "split": "fixture"
+  },
+  "timing": {
+    "started_monotonic_s": 100,
+    "finished_monotonic_s": 101.25,
+    "wall_seconds": 1.25,
+    "timeout_s": 10
+  },
+  "outcome": {
+    "status": "failed",
+    "classification": "infrastructure",
+    "reason_code": "simulator_crash",
+    "message": "Fixture process exited before episode publication."
+  },
+  "retry": {
+    "ordinal": 1,
+    "max_attempts": 2,
+    "eligible": true,
+    "previous_attempt_id": {
+      "availability": "missing",
+      "reason": "not_applicable"
+    },
+    "seed_reused": true
+  },
+  "publication": {
+    "temporary_output_removed": true,
+    "final_episode_published": false,
+    "episode_artifact": {
+      "availability": "missing",
+      "reason": "not_produced"
+    }
+  },
+  "provenance": {
+    "experiment_manifest_sha256": "cc9ed16402a7b4a3eb3642d5d5f78f91d45979935b92a7029a968dccb33930fd",
+    "config_sha256": "cc9ed16402a7b4a3eb3642d5d5f78f91d45979935b92a7029a968dccb33930fd",
+    "runtime_lock_sha256": "b0aac6dff475d8b1287583da185e17aa9c7b390d30ee535398fd54b618d39e67",
+    "source_tree_sha256": "d3bd16c9f882403e45f86a4568ca5bd7d2325c771d3fce30df53ddf413180533"
+  }
+}

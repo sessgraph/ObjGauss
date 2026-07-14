@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.2.0/episode.schema.json",
+  "title": "ObjGauss Sibling Episode Contract",
+  "description": "One complete, successful branch in a controlled sibling intervention experiment.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "initialization",
+    "intervention",
+    "environment",
+    "evidence",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "contract_kind": { "const": "objgauss.episode" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "initialization": { "$ref": "#/$defs/initialization" },
+    "intervention": { "$ref": "#/$defs/intervention" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "evidence": { "$ref": "#/$defs/evidence" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourceCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40,64}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9][a-zA-Z0-9._/-]*$"
+    },
+    "vector3": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "availableIdentifier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "$ref": "#/$defs/identifier" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": { "enum": ["not_applicable", "not_provided"] }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "experiment_id",
+        "fixture_id",
+        "group_id",
+        "branch_id",
+        "episode_id",
+        "attempt_id",
+        "split"
+      ],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "fixture_id": { "$ref": "#/$defs/identifier" },
+        "group_id": { "$ref": "#/$defs/identifier" },
+        "branch_id": { "$ref": "#/$defs/identifier" },
+        "episode_id": { "$ref": "#/$defs/identifier" },
+        "attempt_id": { "$ref": "#/$defs/identifier" },
+        "split": { "enum": ["train", "validation", "test", "preflight", "fixture"] }
+      },
+      "unevaluatedProperties": false
+    },
+    "initialization": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "snapshot_sha256",
+        "initial_state_sha256",
+        "reset_seed",
+        "rng_algorithm",
+        "restored_rng_sha256"
+      ],
+      "properties": {
+        "snapshot_id": { "$ref": "#/$defs/identifier" },
+        "snapshot_sha256": { "$ref": "#/$defs/sha256" },
+        "initial_state_sha256": { "$ref": "#/$defs/sha256" },
+        "reset_seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "rng_algorithm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 96
+        },
+        "restored_rng_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "kind",
+        "vector_W_N",
+        "duration_s",
+        "sim_frequency_hz",
+        "applied_steps"
+      ],
+      "properties": {
+        "kind": { "enum": ["hold", "push"] },
+        "vector_W_N": { "$ref": "#/$defs/vector3" },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "sim_frequency_hz": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "applied_steps": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+      },
+      "unevaluatedProperties": false
+    },
+    "controlLedger": {
+      "type": "object",
+      "required": [
+        "application_mode",
+        "requested_steps",
+        "applied_steps",
+        "force_samples_sha256"
+      ],
+      "properties": {
+        "application_mode": { "const": "force_at_center_of_mass" },
+        "requested_steps": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "applied_steps": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "force_samples_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "intervention": {
+      "type": "object",
+      "required": [
+        "changed_variable",
+        "target_object_id",
+        "commanded_action",
+        "executed_action",
+        "control_ledger"
+      ],
+      "properties": {
+        "changed_variable": { "const": "/intervention/commanded_action" },
+        "target_object_id": { "$ref": "#/$defs/identifier" },
+        "commanded_action": { "$ref": "#/$defs/action" },
+        "executed_action": { "$ref": "#/$defs/action" },
+        "control_ledger": { "$ref": "#/$defs/controlLedger" }
+      },
+      "unevaluatedProperties": false
+    },
+    "simulator": {
+      "type": "object",
+      "required": ["name", "version", "physics_engine", "physics_engine_version", "backend"],
+      "properties": {
+        "name": { "const": "mani-skill" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "physics_engine": { "const": "sapien-physx" },
+        "physics_engine_version": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "backend": { "enum": ["physx_cpu", "physx_cuda"] }
+      },
+      "unevaluatedProperties": false
+    },
+    "physics": {
+      "type": "object",
+      "required": ["gravity_W_m_s2", "static_friction", "dynamic_friction", "restitution"],
+      "properties": {
+        "gravity_W_m_s2": { "$ref": "#/$defs/vector3" },
+        "static_friction": { "type": "number", "minimum": 0 },
+        "dynamic_friction": { "type": "number", "minimum": 0 },
+        "restitution": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "contactConfiguration": {
+      "type": "object",
+      "required": ["enabled", "sample_frequency_hz", "trace_fields"],
+      "properties": {
+        "enabled": { "const": true },
+        "sample_frequency_hz": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "trace_fields": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "body_pair" },
+            { "const": "position_W_m" },
+            { "const": "normal_W" },
+            { "const": "impulse_W_N_s" },
+            { "const": "separation_m" }
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "settlingConfiguration": {
+      "type": "object",
+      "required": ["duration_s", "linear_speed_max_m_s", "angular_speed_max_rad_s"],
+      "properties": {
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "linear_speed_max_m_s": { "type": "number", "minimum": 0 },
+        "angular_speed_max_rad_s": { "type": "number", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "coordinateConvention": {
+      "type": "object",
+      "required": ["id", "world_handedness", "world_up", "length_unit", "force_frame", "force_unit", "time_unit", "quaternion_order"],
+      "properties": {
+        "id": { "const": "robotics-opencv-v1" },
+        "world_handedness": { "const": "right" },
+        "world_up": { "const": "+Z" },
+        "length_unit": { "const": "meter" },
+        "force_frame": { "const": "world" },
+        "force_unit": { "const": "newton" },
+        "time_unit": { "const": "second" },
+        "quaternion_order": { "const": "wxyz" }
+      },
+      "unevaluatedProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "object_spec_id",
+        "layout_id",
+        "start_pose_id",
+        "target_object_id",
+        "simulator",
+        "physics",
+        "contact",
+        "settling",
+        "coordinate_convention"
+      ],
+      "properties": {
+        "object_spec_id": { "$ref": "#/$defs/identifier" },
+        "layout_id": { "$ref": "#/$defs/identifier" },
+        "start_pose_id": { "$ref": "#/$defs/identifier" },
+        "target_object_id": { "$ref": "#/$defs/identifier" },
+        "simulator": { "$ref": "#/$defs/simulator" },
+        "physics": { "$ref": "#/$defs/physics" },
+        "contact": { "$ref": "#/$defs/contactConfiguration" },
+        "settling": { "$ref": "#/$defs/settlingConfiguration" },
+        "coordinate_convention": { "$ref": "#/$defs/coordinateConvention" }
+      },
+      "unevaluatedProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["uri", "media_type", "sha256", "byte_length", "record_count"],
+      "properties": {
+        "uri": { "$ref": "#/$defs/artifactPath" },
+        "media_type": {
+          "enum": [
+            "application/vnd.objgauss.trajectory+json",
+            "application/vnd.objgauss.contact-ledger+json"
+          ]
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "record_count": { "type": "integer", "minimum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "settlingResult": {
+      "type": "object",
+      "required": ["settled", "evaluation_time_s", "final_linear_speed_m_s", "final_angular_speed_rad_s"],
+      "properties": {
+        "settled": { "type": "boolean" },
+        "evaluation_time_s": { "type": "number", "minimum": 0 },
+        "final_linear_speed_m_s": { "type": "number", "minimum": 0 },
+        "final_angular_speed_rad_s": { "type": "number", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["trajectory", "contact_ledger", "terminal_state_sha256", "settling_result"],
+      "properties": {
+        "trajectory": { "$ref": "#/$defs/artifact" },
+        "contact_ledger": { "$ref": "#/$defs/artifact" },
+        "terminal_state_sha256": { "$ref": "#/$defs/sha256" },
+        "settling_result": { "$ref": "#/$defs/settlingResult" }
+      },
+      "unevaluatedProperties": false
+    },
+    "producer": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "objgauss.pr01-writer" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 32 }
+      },
+      "unevaluatedProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "parent_snapshot_id",
+        "previous_attempt_id",
+        "source_gate_report_sha256",
+        "source_commit",
+        "source_tree_sha256",
+        "config_sha256",
+        "runtime_lock_sha256",
+        "asset_manifest_sha256",
+        "producer"
+      ],
+      "properties": {
+        "parent_snapshot_id": { "$ref": "#/$defs/identifier" },
+        "previous_attempt_id": { "$ref": "#/$defs/availableIdentifier" },
+        "source_gate_report_sha256": { "$ref": "#/$defs/sha256" },
+        "source_commit": { "$ref": "#/$defs/sourceCommit" },
+        "source_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "asset_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "producer": { "$ref": "#/$defs/producer" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

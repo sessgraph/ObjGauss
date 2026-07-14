@@ -1,0 +1,48 @@
+{
+  "fixture_id": "pr01a-contract-fixtures-v0",
+  "schema_version": "0.2.0",
+  "frozen_pr00_schema": {
+    "path": "contracts/objgauss/0.1.0/episode.schema.json",
+    "sha256": "b619618706a1bd8da370c465fb36ba8e8edb08ada3406663fc2e2ed2dfa0da9c"
+  },
+  "schemas": [
+    {
+      "path": "contracts/objgauss/0.2.0/attempt.schema.json",
+      "sha256": "827380c8ac507040b88852aa18675738cfaf274b72854a09cf88483d174ee4b6"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/episode.schema.json",
+      "sha256": "52e954dd0215764da636fe6ae86c57a99dc1740f51507818ba459fa2c12eb0b8"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/experiment.schema.json",
+      "sha256": "ba8fce920e1face03369ba1c66fe25696c2e1392fdab917e0c44e170436039cd"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/invariance-report.schema.json",
+      "sha256": "f55b1a8d80ba6f824d13f4bce499577e273f593ab9900ed146d9d54b129ae7aa"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "contracts/fixtures/pr01a/attempt.valid.json",
+      "sha256": "6995a36c57202fe89d3fa587b44ca779e5b1a18755c231d773ba528e6c59db02"
+    },
+    {
+      "path": "contracts/fixtures/pr01a/episode.valid.json",
+      "sha256": "3c498fb33adf1c654e9d5fc90ff9d281d96aa98dc44f8905f2538672c49866c2"
+    },
+    {
+      "path": "contracts/fixtures/pr01a/experiment.valid.json",
+      "sha256": "9615f609e1720b37db933115fbfa4b86e403069e5f351d3fa2c0f86e3cd1bac0"
+    },
+    {
+      "path": "contracts/fixtures/pr01a/invariance-report.valid.json",
+      "sha256": "2633c6164f1656b0c40558a7106c044267fbb403db130e50c189b41f0e431a2e"
+    },
+    {
+      "path": "contracts/fixtures/pr01a/negative-cases.json",
+      "sha256": "f422be408f14f97b4a18baaad5e333b9fcbbf559a0a1b88b351b80507ade386c"
+    }
+  ]
+}

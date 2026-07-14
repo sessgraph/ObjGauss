@@ -1,0 +1,58 @@
+{
+  "record_version": "0.1.0",
+  "status": "supported",
+  "preflight_excluded_from_formal_cohort": true,
+  "groups": 12,
+  "episodes": 60,
+  "failed_attempts": 0,
+  "extra_attempts": 0,
+  "measured": {
+    "wall_seconds": 31.50755085000128,
+    "p95_group_runtime_s": 4.274365681005293,
+    "p95_branch_runtime_s": 0.035103378002531826,
+    "max_branch_runtime_s": 0.04160226999374572,
+    "total_artifact_bytes": 10376599,
+    "p95_group_artifact_bytes": 865669,
+    "max_rss_bytes": 806125568,
+    "min_directional_effect_m": 0.0018430668860673904,
+    "min_strong_over_weak_margin_m": 0.056020106887444854,
+    "max_hold_horizontal_drift_m": 7.847673241542545e-7
+  },
+  "frozen": {
+    "branch_timeout_s": 10,
+    "formal_wall_time_max_s": 300,
+    "formal_artifact_bytes_max": 52428800,
+    "process_rss_max_bytes": 8589934592,
+    "max_extra_attempts": 12,
+    "extra_attempt_fraction_max": 0.05,
+    "thresholds": {
+      "hold_horizontal_drift_max_m": 0.002,
+      "directional_effect_min_m": 0.0014,
+      "strong_over_weak_min_m": 0.005,
+      "final_linear_speed_max_m_s": 0.01,
+      "final_angular_speed_max_rad_s": 0.01
+    }
+  },
+  "budget_basis": {
+    "wall_candidate_s": 257,
+    "wall_rounding": "Rounded upward to the next 60-second boundary.",
+    "artifact_candidate_bytes": 47784929,
+    "artifact_rounding": "Rounded upward to 50 MiB.",
+    "rss_basis": "Retained the Owner-approved 8 GiB process guardrail."
+  },
+  "lineage": {
+    "measurement_spec_uri": "contracts/fixtures/pr01e/cohort-spec-preflight-measured.json",
+    "measurement_experiment_spec_sha256": "fdab5f782cc55177c6c7ecbda93238425e7eac418e9a457c59699b91f42c8623",
+    "active_spec_uri": "contracts/fixtures/pr01e/cohort-spec.json",
+    "active_experiment_spec_sha256": "d1dff64762b6cdb9b860a5292a5fca56f889841bd08e18d67478b0cb54b339ef",
+    "provenance_only_supersession": {
+      "removed_field": "source_commit",
+      "added_field": "source_commit_policy",
+      "policy": "runtime-current-clean-git-head",
+      "scientific_configuration_changed": false
+    },
+    "measurement_manifest_sha256": "268569142b83332bea90347dd1414d9f9329571b1243ec7dc1f32b94b7310d8d",
+    "measurement_cohort_report_sha256": "3baeda3c9af7e1f1693484e274e027b22e28ca675c4a27d456ae1b4d2513fd42",
+    "measurement_audit_report_sha256": "5c3ec89fb6539405647ebcf0cbfa64f53bb28ae31709ba244a6692a590ae09f0"
+  }
+}

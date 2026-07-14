@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ObjGauss · PR-01 Sibling Evidence</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">OBJGAUSS / PR-01 / INDEPENDENT EVIDENCE</p>
+          <h1>同一起点，五种干预</h1>
+          <p class="lede">无 RGB 状态回放 · World +Z up · 统一 0–1.1 s 时间轴</p>
+        </div>
+        <div class="verdict" id="verdict" data-status="loading">
+          <span>MACHINE VERDICT</span><strong>VALIDATING</strong>
+        </div>
+      </header>
+
+      <section class="summary" aria-label="evidence summary">
+        <div><span>GROUP</span><strong id="group-id">—</strong></div>
+        <div><span>SPLIT</span><strong id="split">—</strong></div>
+        <div><span>SNAPSHOT</span><strong id="snapshot">—</strong></div>
+        <div><span>RNG</span><strong id="rng">—</strong></div>
+      </section>
+
+      <section class="branches" id="branches" aria-label="five sibling branches"></section>
+
+      <footer class="transport">
+        <button id="play" type="button" disabled>PLAY</button>
+        <label for="timeline">
+          <span>EPISODE TIME</span>
+          <input id="timeline" type="range" min="0" max="1.1" step="0.01" value="0" disabled />
+        </label>
+        <output id="time">0.00 s</output>
+        <p>Demo 只解释已审计 artifacts；machine report 是事实源。</p>
+      </footer>
+    </main>
+    <template id="branch-template">
+      <article class="branch-card">
+        <header><span class="branch-kind"></span><strong class="branch-name"></strong></header>
+        <canvas width="480" height="340"></canvas>
+        <dl>
+          <div><dt>commanded</dt><dd class="commanded"></dd></div>
+          <div><dt>executed</dt><dd class="executed"></dd></div>
+          <div><dt>settling</dt><dd class="settling"></dd></div>
+          <div><dt>contact</dt><dd class="contact"></dd></div>
+        </dl>
+      </article>
+    </template>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

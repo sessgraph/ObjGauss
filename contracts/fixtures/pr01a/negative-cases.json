@@ -1,0 +1,93 @@
+{
+  "fixture_kind": "objgauss.contract-negative-cases",
+  "version": "0.2.0",
+  "cases": [
+    {
+      "case_id": "latest-version-forbidden",
+      "base": "episode.valid.json",
+      "operation": "set",
+      "path": "/schema_version",
+      "value": "latest",
+      "expected_reason_code": "unsupported-contract-version"
+    },
+    {
+      "case_id": "missing-version-forbidden",
+      "base": "episode.valid.json",
+      "operation": "delete",
+      "path": "/schema_version",
+      "expected_reason_code": "unsupported-contract-version"
+    },
+    {
+      "case_id": "wrong-contract-kind-forbidden",
+      "base": "episode.valid.json",
+      "operation": "set",
+      "path": "/contract_kind",
+      "value": "objgauss.unknown",
+      "expected_reason_code": "unsupported-contract-kind"
+    },
+    {
+      "case_id": "unknown-field-rejected",
+      "base": "episode.valid.json",
+      "operation": "set",
+      "path": "/unexpected",
+      "value": true,
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "unsafe-artifact-path-rejected",
+      "base": "episode.valid.json",
+      "operation": "set",
+      "path": "/evidence/trajectory/uri",
+      "value": "../escape.json",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "changed-variable-is-fixed",
+      "base": "episode.valid.json",
+      "operation": "set",
+      "path": "/intervention/changed_variable",
+      "value": "/environment/physics/static_friction",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "non-finite-number-rejected",
+      "base": "episode.valid.json",
+      "operation": "set-non-finite",
+      "path": "/intervention/commanded_action/vector_W_N/0",
+      "value": "NaN",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "wrong-action-set-rejected",
+      "base": "experiment.valid.json",
+      "operation": "set",
+      "path": "/actions/4/branch_id",
+      "value": "hold",
+      "expected_reason_code": "duplicate-branch-id"
+    },
+    {
+      "case_id": "count-arithmetic-rejected",
+      "base": "experiment.valid.json",
+      "operation": "set",
+      "path": "/design/expected_episode_count",
+      "value": 239,
+      "expected_reason_code": "experiment-count-mismatch"
+    },
+    {
+      "case_id": "successful-attempt-cannot-have-failure",
+      "base": "attempt.valid.json",
+      "operation": "set",
+      "path": "/outcome/status",
+      "value": "succeeded",
+      "expected_reason_code": "attempt-outcome-inconsistent"
+    },
+    {
+      "case_id": "verdict-reason-must-match",
+      "base": "invariance-report.valid.json",
+      "operation": "set",
+      "path": "/verdict/reason_code",
+      "value": "structural_evidence_invalid",
+      "expected_reason_code": "verdict-reason-inconsistent"
+    }
+  ]
+}

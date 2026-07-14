@@ -1,0 +1,17 @@
+{
+  "record_version": "0.1.0",
+  "status": "rejected",
+  "reason_code": "paired_effect_valid",
+  "failed_group_id": "group-box-b-layout-a-start-a-seed-24071501",
+  "failed_branch_id": "push-neg-x-weak",
+  "provisional_directional_effect_min_m": 0.005,
+  "observed_min_directional_effect_m": 0.0018430668860673904,
+  "observed_min_strong_over_weak_margin_m": 0.056020106887444854,
+  "observed_max_hold_horizontal_drift_m": 7.847673241542545e-7,
+  "provisional_spec_sha256": "61782981a6a7f707a625d95e6fb68da988b857209497ef9b820cbc241676d166",
+  "provisional_manifest_sha256": "6a98e44108d20f5bbc6c415618f93a6a5802b197bd039e8ff25b58da92d542f1",
+  "cohort_report_sha256": "5af1f5d473a1cf32c8b07254040458d80a5f6a71e441a3b722dda1e3b01bbaf4",
+  "audit_report_sha256": "70afb3622da4b392e2cacba8e395ace688f14462efbdfa606fc98b935cdbc5b1",
+  "retry_or_seed_replacement_performed": false,
+  "resolution": "Freeze directional_effect_min_m at 0.0014 m from the excluded preflight, then rerun all 12 groups before formal generation."
+}

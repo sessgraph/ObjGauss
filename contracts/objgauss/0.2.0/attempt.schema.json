@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.2.0/attempt.schema.json",
+  "title": "ObjGauss Sibling Branch Attempt",
+  "description": "An immutable execution attempt, including failures and retry lineage; only complete successful attempts may publish an episode.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "timing",
+    "outcome",
+    "retry",
+    "publication",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "contract_kind": { "const": "objgauss.attempt" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "timing": { "$ref": "#/$defs/timing" },
+    "outcome": { "$ref": "#/$defs/outcome" },
+    "retry": { "$ref": "#/$defs/retry" },
+    "publication": { "$ref": "#/$defs/publication" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9][a-zA-Z0-9._/-]*$"
+    },
+    "availableIdentifier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "$ref": "#/$defs/identifier" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": { "enum": ["not_applicable", "not_provided"] }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "availableArtifact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": {
+              "type": "object",
+              "required": ["uri", "sha256"],
+              "properties": {
+                "uri": { "$ref": "#/$defs/artifactPath" },
+                "sha256": { "$ref": "#/$defs/sha256" }
+              },
+              "unevaluatedProperties": false
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": { "enum": ["not_produced", "invalidated", "not_applicable"] }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": ["experiment_id", "group_id", "branch_id", "attempt_id", "split"],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "group_id": { "$ref": "#/$defs/identifier" },
+        "branch_id": { "$ref": "#/$defs/identifier" },
+        "attempt_id": { "$ref": "#/$defs/identifier" },
+        "split": { "enum": ["train", "validation", "test", "preflight", "fixture"] }
+      },
+      "unevaluatedProperties": false
+    },
+    "timing": {
+      "type": "object",
+      "required": ["started_monotonic_s", "finished_monotonic_s", "wall_seconds", "timeout_s"],
+      "properties": {
+        "started_monotonic_s": { "type": "number", "minimum": 0 },
+        "finished_monotonic_s": { "type": "number", "minimum": 0 },
+        "wall_seconds": { "type": "number", "minimum": 0 },
+        "timeout_s": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["status", "classification", "reason_code", "message"],
+      "properties": {
+        "status": { "enum": ["succeeded", "failed"] },
+        "classification": { "enum": ["none", "infrastructure", "scientific", "validation"] },
+        "reason_code": {
+          "enum": [
+            "none",
+            "simulator_crash",
+            "startup_timeout",
+            "atomic_write_failure",
+            "no_contact",
+            "not_settled",
+            "action_mismatch",
+            "schema_invalid",
+            "checksum_mismatch",
+            "lineage_invalid",
+            "non_finite_value"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 }
+      },
+      "unevaluatedProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "required": ["ordinal", "max_attempts", "eligible", "previous_attempt_id", "seed_reused"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "max_attempts": { "const": 2 },
+        "eligible": { "type": "boolean" },
+        "previous_attempt_id": { "$ref": "#/$defs/availableIdentifier" },
+        "seed_reused": { "const": true }
+      },
+      "unevaluatedProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "required": ["temporary_output_removed", "final_episode_published", "episode_artifact"],
+      "properties": {
+        "temporary_output_removed": { "type": "boolean" },
+        "final_episode_published": { "type": "boolean" },
+        "episode_artifact": { "$ref": "#/$defs/availableArtifact" }
+      },
+      "unevaluatedProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["experiment_manifest_sha256", "config_sha256", "runtime_lock_sha256", "source_tree_sha256"],
+      "properties": {
+        "experiment_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "source_tree_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

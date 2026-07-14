@@ -1,0 +1,154 @@
+{
+  "schema_version": "0.2.0",
+  "contract_kind": "objgauss.experiment",
+  "identity": {
+    "experiment_id": "pr01-formal-v0",
+    "fixture_id": "pr01-primitive-push-v0",
+    "experiment_spec_sha256": "cc9ed16402a7b4a3eb3642d5d5f78f91d45979935b92a7029a968dccb33930fd"
+  },
+  "source_gate": {
+    "status": "supported",
+    "report_sha256": "7674028fed1825b2ffe85689a9ca3048bf10c317ec9402f159a86ff803736e61",
+    "evidence_sha256": "3c2c8a7dec7d7626d158907b6fc7981a89e27645b342a8116c4a8ac1094616f2"
+  },
+  "contract_versions": {
+    "episode": "0.2.0",
+    "experiment": "0.2.0",
+    "attempt": "0.2.0",
+    "invariance_report": "0.2.0"
+  },
+  "design": {
+    "object_spec_ids": ["box-a", "box-b"],
+    "layout_ids": ["layout-a", "layout-b", "layout-c"],
+    "start_pose_ids": ["start-a", "start-b"],
+    "reset_seeds": [24071401, 24071402, 24071403, 24071404],
+    "expected_group_count": 48,
+    "expected_episode_count": 240,
+    "branches_per_group": 5,
+    "changed_variable": "/intervention/commanded_action"
+  },
+  "actions": [
+    {
+      "branch_id": "hold",
+      "kind": "hold",
+      "vector_W_N": [0, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    {
+      "branch_id": "push-pos-x-weak",
+      "kind": "push",
+      "vector_W_N": [0.35, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    {
+      "branch_id": "push-pos-x-strong",
+      "kind": "push",
+      "vector_W_N": [0.7, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    {
+      "branch_id": "push-neg-x-weak",
+      "kind": "push",
+      "vector_W_N": [-0.35, 0, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    },
+    {
+      "branch_id": "push-pos-y-weak",
+      "kind": "push",
+      "vector_W_N": [0, 0.35, 0],
+      "duration_s": 0.1,
+      "sim_frequency_hz": 100,
+      "applied_steps": 10
+    }
+  ],
+  "split_policy": {
+    "unit": "sibling_group",
+    "algorithm": "sha256-seed-rank-v1",
+    "strata": ["object_spec_id", "layout_id", "start_pose_id"],
+    "seed_rank_allocation": {
+      "train": 2,
+      "validation": 1,
+      "test": 1
+    },
+    "counts": {
+      "train_groups": 24,
+      "validation_groups": 12,
+      "test_groups": 12,
+      "train_episodes": 120,
+      "validation_episodes": 60,
+      "test_episodes": 60
+    }
+  },
+  "preflight": {
+    "excluded_from_formal_cohort": true,
+    "start_pose_ids": ["start-a"],
+    "reserved_reset_seeds": [24071501, 24071502],
+    "expected_group_count": 12,
+    "expected_episode_count": 60,
+    "freezes": [
+      "branch_timeout_s",
+      "contact_settling_effect_thresholds",
+      "p95_runtime_s",
+      "p95_artifact_bytes",
+      "formal_resource_budget"
+    ]
+  },
+  "retry_policy": {
+    "max_retries_per_branch": 1,
+    "max_extra_attempts": 12,
+    "retryable_classes": [
+      "simulator_crash",
+      "startup_timeout",
+      "atomic_write_failure"
+    ],
+    "non_retryable_classes": [
+      "no_contact",
+      "not_settled",
+      "action_mismatch"
+    ],
+    "forbid_seed_replacement": true
+  },
+  "budgets": {
+    "branch_timeout_s": 10,
+    "formal_wall_time_max_s": 900,
+    "formal_artifact_bytes_max": 104857600,
+    "process_rss_max_bytes": 8589934592,
+    "extra_attempt_fraction_max": 0.05
+  },
+  "thresholds": {
+    "hold_horizontal_drift_max_m": 0.002,
+    "directional_effect_min_m": 0.005,
+    "strong_over_weak_min_m": 0.005,
+    "final_linear_speed_max_m_s": 0.01,
+    "final_angular_speed_max_rad_s": 0.01
+  },
+  "runtime": {
+    "python": "3.10.20",
+    "mani_skill": "3.0.1",
+    "sapien": "3.0.3",
+    "torch": "2.13.0+cu130",
+    "backend": "physx_cpu",
+    "lock_uri": "sim/requirements.lock",
+    "lock_sha256": "b0aac6dff475d8b1287583da185e17aa9c7b390d30ee535398fd54b618d39e67",
+    "asset_policy": "builtin-primitives-only",
+    "network_policy": "offline-at-runtime"
+  },
+  "claim_boundary": {
+    "allows": ["programmatic-cpu-primitive-sibling-evidence"],
+    "forbids": [
+      "model-training",
+      "gaussian-dynamics",
+      "external-data",
+      "rgb-gpu-renderer",
+      "robot-control"
+    ]
+  }
+}

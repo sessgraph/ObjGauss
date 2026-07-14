@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+NODE_BIN="${OBJGAUSS_NODE:-node}"
+cd "$ROOT"
+
+WORKTREE_STATUS="$(git status --porcelain=v1 --untracked-files=all)"
+if [[ -n "$WORKTREE_STATUS" ]]; then
+  printf 'invalid: PR-01 acceptance requires a clean checkout; commit or remove all non-ignored changes\n' >&2
+  exit 4
+fi
+
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+npm ci
+npm run check
+OBJGAUSS_NODE="$NODE_BIN" ./scripts/check-pr01b-runtime
+OBJGAUSS_NODE="$NODE_BIN" ./scripts/check-pr01e-cohort
+"$NODE_BIN" scripts/build-pr01-delivery.mjs
+"$NODE_BIN" --test tests/pr01f-delivery.test.mjs
+"$NODE_BIN" scripts/verify-pr01-delivery.mjs

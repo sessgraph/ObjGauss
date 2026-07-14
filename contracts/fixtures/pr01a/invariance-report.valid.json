@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.2.0",
+  "contract_kind": "objgauss.invariance_report",
+  "audit_kind": "sibling_invariance",
+  "identity": {
+    "report_id": "pr01a-fixture-report",
+    "experiment_id": "pr01-fixture",
+    "fixture_id": "pr01a-golden-v0"
+  },
+  "evaluator": {
+    "name": "objgauss.pr01-invariance-audit",
+    "version": "0.1.0",
+    "source_sha256": "9191476da73f7dc4fc10dc3d53a2fe82f698bf6468022f2b2e86e81a9e21513e",
+    "imports_writer_logic": false
+  },
+  "inputs": {
+    "experiment_manifest_sha256": "cc9ed16402a7b4a3eb3642d5d5f78f91d45979935b92a7029a968dccb33930fd",
+    "episode_index_sha256": "4253034d801244e43f3bec612aaa6e8023ed059d44c0de9e974a777cd9f4eeec",
+    "attempt_index_sha256": "636a8b7b640734e673bdcf0d915f19e32ff0ea5b2aafcd213ccf911c9d4a4c95",
+    "source_gate_report_sha256": "7674028fed1825b2ffe85689a9ca3048bf10c317ec9402f159a86ff803736e61"
+  },
+  "verdict": {
+    "status": "supported",
+    "reason_code": "all_hard_gates_passed",
+    "aggregation_priority": ["invalid", "rejected", "blocked", "supported"]
+  },
+  "counts": {
+    "expected_groups": 1,
+    "observed_groups": 1,
+    "expected_episodes": 5,
+    "observed_episodes": 5,
+    "attempts": 6,
+    "failed_attempts": 1
+  },
+  "checks": [
+    {
+      "check_id": "fixture-schema",
+      "status": "supported",
+      "reason_code": "schema_valid",
+      "group_id": { "availability": "missing", "reason": "not_applicable" },
+      "branch_id": { "availability": "missing", "reason": "not_applicable" },
+      "evidence_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "negative_cases": [
+    { "case_id": "snapshot_changed", "outcome": "passed", "expected_status": "rejected", "expected_reason_code": "snapshot_changed" },
+    { "case_id": "rng_changed", "outcome": "passed", "expected_status": "rejected", "expected_reason_code": "rng_changed" },
+    { "case_id": "physics_changed", "outcome": "passed", "expected_status": "rejected", "expected_reason_code": "physics_changed" },
+    { "case_id": "cross_split_leakage", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "cross_split_leakage" },
+    { "case_id": "action_missing_or_duplicate", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "action_missing_or_duplicate" },
+    { "case_id": "ledger_missing", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "ledger_missing" },
+    { "case_id": "contact_tampered", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "contact_tampered" },
+    { "case_id": "checksum_mismatch", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "checksum_mismatch" },
+    { "case_id": "lineage_broken", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "lineage_broken" },
+    { "case_id": "attempt_timeout", "outcome": "passed", "expected_status": "blocked", "expected_reason_code": "attempt_timeout" },
+    { "case_id": "non_finite_value", "outcome": "passed", "expected_status": "invalid", "expected_reason_code": "non_finite_value" }
+  ],
+  "artifacts": {
+    "machine_report_uri": "artifacts/pr01/audit-report.json",
+    "human_report_uri": "artifacts/pr01/audit-report.md",
+    "checksums_uri": "artifacts/pr01/checksums.sha256"
+  },
+  "claim_boundary": {
+    "supported_claim": "controlled-sibling-evidence-is-structurally-and-semantically-auditable",
+    "excluded_claims": [
+      "causal-model-understanding",
+      "gaussian-dynamics",
+      "robot-planning-value"
+    ]
+  }
+}

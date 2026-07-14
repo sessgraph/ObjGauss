@@ -1,0 +1,46 @@
+:root {
+  color-scheme: dark;
+  --bg: #07100d;
+  --panel: #0d1915;
+  --line: rgba(187, 255, 221, 0.15);
+  --ink: #edf8f2;
+  --muted: #8fa69b;
+  --acid: #8bffbd;
+  --cyan: #69d9ff;
+  --orange: #ffad66;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; background: radial-gradient(circle at 50% -20%, #19372b, var(--bg) 42%); color: var(--ink); }
+main { width: min(1800px, 100%); min-height: 100vh; margin: auto; padding: 28px; display: grid; gap: 18px; }
+.masthead { display: flex; justify-content: space-between; align-items: end; gap: 24px; }
+.eyebrow, .lede, .transport p { margin: 0; color: var(--muted); font: 650 11px/1.5 ui-monospace, monospace; letter-spacing: .12em; }
+h1 { margin: 5px 0; font-size: clamp(30px, 4vw, 62px); line-height: .96; letter-spacing: -.045em; }
+.verdict { min-width: 170px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.25); }
+.verdict span, .summary span { display: block; margin-bottom: 4px; color: var(--muted); font: 650 9px ui-monospace, monospace; letter-spacing: .14em; }
+.verdict strong { color: var(--muted); }
+.verdict[data-status="supported"] { border-color: rgba(139,255,189,.5); box-shadow: inset 0 0 28px rgba(139,255,189,.06); }
+.verdict[data-status="supported"] strong { color: var(--acid); }
+.verdict[data-status="invalid"] strong { color: #ff7d7d; }
+.summary { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(13,25,21,.72); }
+.summary div { min-width: 0; padding: 11px 14px; border-right: 1px solid var(--line); }
+.summary div:last-child { border: 0; }
+.summary strong { display: block; overflow: hidden; font: 600 11px ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.branches { min-height: 520px; display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 10px; }
+.branch-card { min-width: 0; display: grid; grid-template-rows: auto minmax(220px, 1fr) auto; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, rgba(16,33,27,.95), rgba(8,17,14,.95)); }
+.branch-card > header { padding: 12px 13px; display: grid; gap: 3px; border-bottom: 1px solid var(--line); }
+.branch-card > header span { color: var(--acid); font: 650 9px ui-monospace, monospace; letter-spacing: .12em; }
+.branch-card > header strong { font-size: 13px; }
+canvas { width: 100%; height: 100%; display: block; background: #08120f; }
+dl { margin: 0; padding: 4px 12px 10px; }
+dl div { padding: 6px 0; display: grid; grid-template-columns: 70px 1fr; border-top: 1px solid rgba(255,255,255,.06); gap: 8px; }
+dt { color: var(--muted); font: 600 9px ui-monospace, monospace; }
+dd { margin: 0; text-align: right; font: 600 9px ui-monospace, monospace; overflow-wrap: anywhere; }
+.transport { display: grid; grid-template-columns: auto minmax(180px, 1fr) 72px minmax(220px, auto); align-items: center; gap: 16px; }
+button { padding: 10px 18px; border: 1px solid var(--acid); border-radius: 999px; background: transparent; color: var(--acid); font: 750 10px ui-monospace, monospace; cursor: pointer; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+.transport label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; color: var(--muted); font: 650 9px ui-monospace, monospace; letter-spacing: .12em; }
+input { width: 100%; accent-color: var(--acid); }
+output { font: 700 11px ui-monospace, monospace; }
+@media (max-width: 1150px) { .branches { grid-template-columns: repeat(2, minmax(250px, 1fr)); } .branch-card:last-child { grid-column: 1 / -1; } }
+@media (max-width: 680px) { main { padding: 16px; } .masthead { align-items: start; flex-direction: column; } .verdict { width: 100%; } .summary { grid-template-columns: 1fr 1fr; } .branches { grid-template-columns: 1fr; } .branch-card:last-child { grid-column: auto; } .transport { grid-template-columns: auto 1fr 60px; } .transport p { grid-column: 1 / -1; } }

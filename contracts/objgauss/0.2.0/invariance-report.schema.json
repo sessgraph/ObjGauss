@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.2.0/invariance-report.schema.json",
+  "title": "ObjGauss Sibling Invariance Report",
+  "description": "Independent, machine-readable adjudication of sibling episode and cohort invariants.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "audit_kind",
+    "identity",
+    "evaluator",
+    "inputs",
+    "verdict",
+    "counts",
+    "checks",
+    "negative_cases",
+    "artifacts",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "contract_kind": { "const": "objgauss.invariance_report" },
+    "audit_kind": { "const": "sibling_invariance" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "evaluator": { "$ref": "#/$defs/evaluator" },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "verdict": { "$ref": "#/$defs/verdict" },
+    "counts": { "$ref": "#/$defs/counts" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "negative_cases": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/negativeCase" }
+    },
+    "artifacts": { "$ref": "#/$defs/artifacts" },
+    "claim_boundary": { "$ref": "#/$defs/claimBoundary" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9][a-zA-Z0-9._/-]*$"
+    },
+    "availableIdentifier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "$ref": "#/$defs/identifier" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": { "enum": ["not_applicable", "not_available"] }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": ["report_id", "experiment_id", "fixture_id"],
+      "properties": {
+        "report_id": { "$ref": "#/$defs/identifier" },
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "fixture_id": { "$ref": "#/$defs/identifier" }
+      },
+      "unevaluatedProperties": false
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["name", "version", "source_sha256", "imports_writer_logic"],
+      "properties": {
+        "name": { "const": "objgauss.pr01-invariance-audit" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "imports_writer_logic": { "const": false }
+      },
+      "unevaluatedProperties": false
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["experiment_manifest_sha256", "episode_index_sha256", "attempt_index_sha256", "source_gate_report_sha256"],
+      "properties": {
+        "experiment_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "episode_index_sha256": { "$ref": "#/$defs/sha256" },
+        "attempt_index_sha256": { "$ref": "#/$defs/sha256" },
+        "source_gate_report_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["status", "reason_code", "aggregation_priority"],
+      "properties": {
+        "status": { "enum": ["supported", "rejected", "blocked", "invalid"] },
+        "reason_code": {
+          "enum": [
+            "all_hard_gates_passed",
+            "scientific_gate_failed",
+            "evidence_incomplete",
+            "structural_evidence_invalid"
+          ]
+        },
+        "aggregation_priority": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "invalid" },
+            { "const": "rejected" },
+            { "const": "blocked" },
+            { "const": "supported" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "required": ["expected_groups", "observed_groups", "expected_episodes", "observed_episodes", "attempts", "failed_attempts"],
+      "properties": {
+        "expected_groups": { "type": "integer", "minimum": 0 },
+        "observed_groups": { "type": "integer", "minimum": 0 },
+        "expected_episodes": { "type": "integer", "minimum": 0 },
+        "observed_episodes": { "type": "integer", "minimum": 0 },
+        "attempts": { "type": "integer", "minimum": 0 },
+        "failed_attempts": { "type": "integer", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["check_id", "status", "reason_code", "group_id", "branch_id", "evidence_sha256"],
+      "properties": {
+        "check_id": { "$ref": "#/$defs/identifier" },
+        "status": { "enum": ["supported", "rejected", "blocked", "invalid"] },
+        "reason_code": {
+          "enum": [
+            "schema_valid",
+            "path_safe",
+            "checksum_valid",
+            "ids_unique",
+            "lineage_complete",
+            "five_branches_complete",
+            "group_split_isolated",
+            "initialization_invariant",
+            "physics_invariant",
+            "only_commanded_action_changed",
+            "action_ledger_consistent",
+            "contact_trace_valid",
+            "settling_recomputed",
+            "paired_effect_valid",
+            "snapshot_changed",
+            "rng_changed",
+            "physics_changed",
+            "cross_split_leakage",
+            "action_missing_or_duplicate",
+            "ledger_missing",
+            "contact_tampered",
+            "checksum_mismatch",
+            "lineage_broken",
+            "attempt_timeout",
+            "non_finite_value",
+            "evidence_missing"
+          ]
+        },
+        "group_id": { "$ref": "#/$defs/availableIdentifier" },
+        "branch_id": { "$ref": "#/$defs/availableIdentifier" },
+        "evidence_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "negativeCase": {
+      "type": "object",
+      "required": ["case_id", "outcome", "expected_status", "expected_reason_code"],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "snapshot_changed",
+            "rng_changed",
+            "physics_changed",
+            "cross_split_leakage",
+            "action_missing_or_duplicate",
+            "ledger_missing",
+            "contact_tampered",
+            "checksum_mismatch",
+            "lineage_broken",
+            "attempt_timeout",
+            "non_finite_value"
+          ]
+        },
+        "outcome": { "const": "passed" },
+        "expected_status": { "enum": ["rejected", "blocked", "invalid"] },
+        "expected_reason_code": { "type": "string", "minLength": 1, "maxLength": 96 }
+      },
+      "unevaluatedProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["machine_report_uri", "human_report_uri", "checksums_uri"],
+      "properties": {
+        "machine_report_uri": { "$ref": "#/$defs/artifactPath" },
+        "human_report_uri": { "$ref": "#/$defs/artifactPath" },
+        "checksums_uri": { "$ref": "#/$defs/artifactPath" }
+      },
+      "unevaluatedProperties": false
+    },
+    "claimBoundary": {
+      "type": "object",
+      "required": ["supported_claim", "excluded_claims"],
+      "properties": {
+        "supported_claim": { "const": "controlled-sibling-evidence-is-structurally-and-semantically-auditable" },
+        "excluded_claims": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "causal-model-understanding" },
+            { "const": "gaussian-dynamics" },
+            { "const": "robot-planning-value" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

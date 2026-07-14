@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_ROOT="$ROOT/sim"
+OUTPUT_ROOT="$ROOT/generated/pr01c"
+NODE_BIN="${OBJGAUSS_NODE:-node}"
+cd "$ROOT"
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/writer.XXXXXX")"
+VENV="$WORK_ROOT/venv"
+ASSET_DIR="$WORK_ROOT/no-assets"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+mkdir "$ASSET_DIR" "$WORK_ROOT/xdg-cache" "$WORK_ROOT/mpl-cache"
+chmod 0555 "$ASSET_DIR"
+export UV_PROJECT_ENVIRONMENT="$VENV"
+uv sync \
+  --project "$SIM_ROOT" \
+  --frozen \
+  --extra runtime \
+  --no-dev \
+  --no-install-project \
+  --no-build
+uv sync \
+  --project "$SIM_ROOT" \
+  --frozen \
+  --extra runtime \
+  --no-dev
+
+export OBJGAUSS_REPO_ROOT="$ROOT"
+export OBJGAUSS_NODE="$NODE_BIN"
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export UV_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export MS_ASSET_DIR="$ASSET_DIR"
+export XDG_CACHE_HOME="$WORK_ROOT/xdg-cache"
+export MPLCONFIGDIR="$WORK_ROOT/mpl-cache"
+unset MS_SKIP_ASSET_DOWNLOAD_PROMPT || true
+
+"$VENV/bin/python" -m unittest discover -s "$SIM_ROOT/tests" -p 'test_*.py'
+"$NODE_BIN" scripts/validate-pr01-document.mjs contracts/fixtures/pr01c/experiment.valid.json
+"$VENV/bin/objgauss-pr01-golden" \
+  --order canonical \
+  --output-root "$WORK_ROOT/canonical" \
+  --report "$WORK_ROOT/canonical-report.json" \
+  --config contracts/fixtures/pr01c/golden-group-config.json \
+  --experiment contracts/fixtures/pr01c/experiment.valid.json \
+  --lock sim/uv.lock \
+  --validator scripts/validate-pr01-document.mjs \
+  --node "$NODE_BIN" \
+  --source-commit "$SOURCE_COMMIT"
+"$VENV/bin/objgauss-pr01-golden" \
+  --order reverse \
+  --output-root "$WORK_ROOT/reverse" \
+  --report "$WORK_ROOT/reverse-report.json" \
+  --compare "$WORK_ROOT/canonical-report.json" \
+  --config contracts/fixtures/pr01c/golden-group-config.json \
+  --experiment contracts/fixtures/pr01c/experiment.valid.json \
+  --lock sim/uv.lock \
+  --validator scripts/validate-pr01-document.mjs \
+  --node "$NODE_BIN" \
+  --source-commit "$SOURCE_COMMIT"
+"$NODE_BIN" scripts/audit-pr01c-golden.mjs \
+  "$WORK_ROOT/canonical" \
+  "$WORK_ROOT/reverse" \
+  "$WORK_ROOT/canonical-report.json" \
+  "$WORK_ROOT/reverse-report.json" > "$WORK_ROOT/golden-audit.json"
+
+cp "$WORK_ROOT/canonical-report.json" "$OUTPUT_ROOT/canonical-report.json"
+cp "$WORK_ROOT/reverse-report.json" "$OUTPUT_ROOT/reverse-report.json"
+cp "$WORK_ROOT/golden-audit.json" "$OUTPUT_ROOT/golden-audit.json"
+rm -rf -- "$OUTPUT_ROOT/golden"
+mkdir "$OUTPUT_ROOT/golden"
+cp -R "$WORK_ROOT/reverse/." "$OUTPUT_ROOT/golden/"
+cat "$OUTPUT_ROOT/golden-audit.json"

@@ -1,10 +1,12 @@
 # ObjGauss 对象中心 Gaussian 世界模型 PRD
 
-> 状态：Draft；`PR-00` 窄假设已在本地形成可复现证据，等待提交评审
-> 版本：0.4
+> 状态：Draft；`PR-00` 已固化，PR-01 source gate 与 `PR-01A`–`PR-01E` 已本地支持，
+> `PR-01F` 已实现但仍待最终 clean commit/远端 CI
+> 版本：0.10
 > 日期：2026-07-14
-> 当前验收范围：文档、Stage-0 本地预览与 `PR-00` synthetic contract 证据；不包含模型、
-> 原始训练数据或下游研究结论
+> 当前验收范围：文档、Stage-0 本地预览、`PR-00` synthetic contract 证据与无渲染 primitive
+> sibling action/contact pilot、`0.2.0` contract、隔离 production runtime、原子 writer、独立 audit、冻结 formal cohort 与无 RGB Delivery；不表示完整 PR-01 已关闭，也不包含模型、原始训练数据或
+> 下游研究结论
 >
 > 知识状态：“一个实现 PR 只引入一个可证伪假设”、`PR-04` Gaussian 生死门，以及
 > “面向研究评审的 Demo A 是首个验收目标”已经由 Owner 确认为 `decision`；`PR-04` 的
@@ -21,7 +23,29 @@
 > Owner 已完成 `PR-00` Decision Freeze。当前本地实现使用唯一 JSON Schema `0.1.0`、固定
 > `synthetic-audit-v0`、独立 evaluator 与 Web consumer，在 36 个 primary points 上得到
 > `max_camera_reprojection_error_px = 1.005e-14 < 1.0` 的 `supported` 窄裁决；它不支持真实
-> 数据、Gaussian 重建、世界模型、动力学或规划价值声明，也不表示代码已经提交或合并。
+> 数据、Gaussian 重建、世界模型、动力学或规划价值声明；提交尚未 push，远端 CI 也未运行。
+> 固定 ManiSkill 3.0.1 的 CPU/no-render primitive pilot 进一步支持了同 snapshot/RNG 的五个
+> external-force sibling action/contact outcomes，并通过相反 branch 顺序的独立进程复跑；它只
+> 批准 PR-01 primitive push source，不代表 robot controller、renderer/GPU 或完整 PR-01 已实现。
+> Owner 已决定把 PR-01 作为一个验收里程碑，内部依次拆成 Contract、Runtime、Writer、
+> Independent Audit、Cohort 和 Delivery 六个切片；独立审计先于正式 cohort。Contract 使用
+> `0.2.0` episode/experiment/attempt/invariance-report 四层记录，production simulator 只作为
+> 隔离 `sim` optional extra，Demo 使用无 RGB 五联状态回放。完整决策见 ADR-003。
+> PR-01B 已用精确 uv lock 从全新临时 venv 完成 wheel-only 外部依赖安装，并在显式 offline、
+> 空只读 asset 门下由 canonical/reverse 两个真实进程得到一致五分支 evidence；这只支持
+> production runtime 可复现。远端 CI 尚未运行。
+> PR-01C 已由真实 canonical/reverse 进程生成语义一致的五分支 golden group，并通过原子发布、
+> 幂等 replay、冲突拒绝、失败 attempt 与非有限值负例；这只支持单 group writer，不表示独立
+> audit、正式 cohort、最终 commit lineage 或远端 CI 已完成。
+> PR-01D 已在重新生成的真实 golden group 上独立重算 14 个 hard gates，并让 11 类预注册
+> mutation 命中稳定四态与 reason code；这只支持审计器及 fixture，不表示 preflight、正式
+> cohort 或最终交付已完成。
+> PR-01E 已保留一次 provisional effect threshold rejection，再用 preflight 冻结阈值与资源预算；
+> 正式 48 groups / 240 episodes、24/12/12 split、零额外 attempt 通过独立审计。该结果仍不表示
+> 最终 commit lineage、远端 CI、因果模型理解或 Gaussian dynamics 已完成。
+> PR-01F 的五联状态 Demo、Delivery report/checksums、clean-checkout guard 与 `accept-pr01` 已实现；
+> source commit 在运行时绑定当前 clean HEAD，不能在冻结 spec 中自引用。当前 dirty worktree 会被
+> builder/verifier 正确拒绝，因此最终 SHA 的一键验收和远端 CI 尚未完成。
 > 归档事实和候选资源状态由 [`../REFERENCES.md`](../REFERENCES.md) 统一维护。
 
 ## 1. 决策摘要
@@ -153,9 +177,11 @@ depth、mask、report 和 browser bundle 均位于 ignored `generated/pr00/`，�
 
 ## 6. 概念数据协议
 
-本节是 PRD 级概念语义，不是可执行 schema。`PR-00` 的字段类型和序列化已经由
-[`episode.schema.json`](../contracts/objgauss/0.1.0/episode.schema.json) 建立；发生冲突时机器
-实例以该唯一 schema 为准，同时必须修正文档投影，不得维护第二份字段真值。
+本节是 PRD 级概念语义，不是可执行 schema。`PR-00` 的 synthetic audit 字段由
+[`0.1.0 episode`](../contracts/objgauss/0.1.0/episode.schema.json) 建立；PR-01 sibling evidence
+分别由 [`0.2.0 episode`](../contracts/objgauss/0.2.0/episode.schema.json)、experiment、attempt
+和 invariance-report schema 建立。发生冲突时，实例按精确 `schema_version + contract_kind`
+选择的机器 schema 为准；不得使用 `latest`、静默升级或第二份字段真值。
 
 ### 6.1 公共信封
 
@@ -172,10 +198,11 @@ raw_checksum, transform_version
 capabilities
 ```
 
-首版 `schema_version` 固定为 `0.1.0`，并与版本化 `$id` 精确匹配。所有 object schema 使用
-`unevaluatedProperties: false` 拒绝未知字段。已发布 schema 不得原地修改；`0.x` 中任何改变
-合法实例集合的修改升级 MINOR，PATCH 只能修改不影响 contract 的说明、示例或错误文本。
-跨版本迁移必须显式、可测试，记录迁移前后 checksum 与 lineage；consumer 禁止静默升级。
+`0.1.0` 固定为 PR-00 synthetic episode，字节不可变；`0.2.0` 固定为 PR-01 sibling evidence
+family。所有 object schema 使用 `unevaluatedProperties: false` 拒绝未知字段。已发布 schema
+不得原地修改；`0.x` 中任何改变合法实例集合的修改升级 MINOR，PATCH 只能修改不影响 contract
+的说明、示例或错误文本。不存在自动 `0.1.0 -> 0.2.0` 迁移，因为 snapshot、RNG、contact、
+attempt 和 lineage 无法推断；其他跨版本迁移也必须显式、可测试并记录前后 checksum。
 
 所有可能缺失的 contract 值使用以下唯一语义：
 
@@ -385,6 +412,15 @@ push(+x, strong)
 push(-x, weak)
 push(+y, weak)
 ```
+
+PR-01 正式 cohort 固定为 `2 object specs × 3 layouts × 2 start poses × 4 reset seeds = 48 sibling
+groups / 240 episodes`。每个 `(object, layout, start)` stratum 内按 seed 的稳定 SHA-256 排序，
+用 `2/1/1` 分配为 `24/12/12` train/validation/test groups；禁止 Python `hash()` 或按 episode
+row 随机切分。正式 cohort 前运行完全隔离的 `12 groups / 60 episodes` preflight，只用于冻结
+timeout、effect/contact/settling thresholds、p95 runtime/size 和正式资源预算，不进入训练或统计。
+正式 episode 的 `source_commit` 必须由验收进程从当前 clean Git HEAD 注入并与 Delivery/CI SHA
+一致；冻结 experiment spec 只记录 `runtime-current-clean-git-head` 策略，不得硬编码一个未来
+提交无法自引用的旧 SHA。Dirty worktree 必须 `invalid`，不能生成最终 Delivery 声明。
 
 以上 `hold + push` 是 `PR-04` primary endpoint 的唯一 action cohort。`grasp/lift` 使用同一
 类起点但必须拆成独立 secondary cohort，并配置与其动作时长匹配的 hold 对照；其结果不得

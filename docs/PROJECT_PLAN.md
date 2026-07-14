@@ -1,7 +1,8 @@
 # ObjGauss 假设驱动实施路径
 
-> 状态：Stage-0 已提交；`PR-00` 本地实现通过冻结门，等待提交评审
-> 版本：0.5
+> 状态：Stage-0 与 `PR-00` 已提交；PR-01 source gate 与 `PR-01A`–`PR-01E` 已本地支持，
+> `PR-01F` 已实现并等待最终 clean commit/远端 CI
+> 版本：0.12
 > 日期：2026-07-14
 > 上位需求：`PRD.md`
 >
@@ -42,14 +43,33 @@
 > - `decision`：Stage-0 只做 Web，并以可自由浏览的环境级 Gaussian scene 为默认体验；不得用
 >   单物体加假地面网格包装成“世界”，也不得伪造 `PR-00` episode、坐标轴或轨迹。
 > - `confirmed_fact`：Stage-0 已由提交 `c1927b1` 固化；ignored 外部审计样例没有进入 Git。
-> - `decision`：下一实现阶段是 `PR-00`；固定 seed/config 的仓库内 JavaScript producer 生成
+> - `decision`：`PR-00` 使用固定 seed/config 的仓库内 JavaScript producer 生成
 >   `synthetic-audit-v0`，不下载外部数据，也不读取旧归档。
-> - `confirmed_fact`：`PR-00` 当前本地 `npm run check` 结果为 `supported`；36 个 primary
->   points 的最大重投影误差为 `1.005e-14 px`，资源/lineage 与 14 类预注册负例通过。该事实
->   不表示代码已提交、远端 CI 已运行或下游假设已支持。
-> - `working_assumption`：ManiSkill、HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
+> - `confirmed_fact`：`PR-00` 由提交 `b4107fa` 固化；本地 `npm run check` verdict 为
+>   `supported`，36 个 primary points 的最大重投影误差为 `1.005e-14 px`，资源/lineage 与
+>   14 类预注册负例通过。远端 CI 尚未运行，下游假设也未因此支持。
+> - `confirmed_fact`：ManiSkill `3.0.1` 的官方 release、PyPI wheel/hash、许可、snapshot/reset
+>   和平台要求已由 RES-001 核验。CPython 3.12 的 `A-0` 因 `toppra` 无匹配 wheel 在解析阶段
+>   失败；CPython 3.10.20 的 `A-1` 已通过安装、import 和宿主 GPU probe。Snapshot pilot 的
+>   五 sibling full hash 与两次进程 evidence hash 均一致；上游 state-only restore 不包含 RNG，
+>   显式 RNG capture/restore 是 PR-01 adapter 的强制责任。随后 programmatic CPU primitive
+>   external-force action/contact pilot 也通过 canonical/reverse 两个独立进程，ManiSkill 因此为
+>   `approved_pr01_primitive_cpu_push_source`，但不是完整 approved simulator。
+> - `decision`：PR-01 是一个验收里程碑，内部按 Contract、Runtime、Writer、Independent Audit、
+>   Cohort、Delivery 六个独立切片推进；Independent Audit 必须先于正式 cohort。
+> - `decision`：PR-01 使用 `0.2.0` episode、experiment、attempt、invariance-report 四层 contract；
+>   `0.1.0` 字节冻结，精确版本分派，禁止 `latest`、静默升级或自动迁移。
+> - `decision`：production simulator 使用隔离 `sim` optional extra，只允许 primitive 离线生成、
+>   adapter/writer/smoke/CI；独立 auditor 不依赖 ManiSkill 或 writer。禁止 RGB/GPU renderer、
+>   外部 asset、训练、模型、Gaussian dynamics 和机器人控制。
+> - `decision`：PR-01 Demo 使用无 RGB 五联状态回放，只消费已审计 episode；machine report 是
+>   验收事实源。
+> - `working_assumption`：HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
 >   模型家族和未冻结数值阈值；`RES-001` 可以用更合适的获批来源替换。
-> - 当前只有 Stage-0 与 `PR-00` 在本地实现；本文不表示 `PR-01`–`PR-11` 已创建、提交或通过。
+> - 当前本地实现包括 Stage-0、`PR-00`、独立 RES-001 snapshot audit tool、PR-01 primitive
+>   sibling action/contact gate 与 PR-01A–F contract/runtime/writer/audit/cohort/Delivery；本文不表示
+>   最终 clean commit、远端 CI、完整 PR-01 关闭或模型已实现，也不表示
+>   `PR-01`–`PR-11` 已创建、提交或通过。
 
 ## 1. 路径结论
 
@@ -101,8 +121,8 @@ flowchart TD
 ## 2. 当前本地事实与开工前置门
 
 当前目录 **是有效 Git worktree**。Stage-0 WebGL2 Gaussian world viewer 已由提交 `c1927b1`
-固化；当前未提交工作区还包含 `PR-00` 的唯一 JSON Schema、Node/npm 工具链、确定性 synthetic
-producer、独立 evaluator、Web consumer、行为测试与 CI workflow。本地 ignored `data/` 中的
+固化，`PR-00` contract/evaluator/Web evidence gate 已由提交 `b4107fa` 固化。本地 ignored
+`data/` 中的
 103,060-record `.splat` 只属于 Stage-0；ignored `generated/pr00/` 只包含可重建的 synthetic
 episode、数组、report 与 browser bundle。两者都不是模型源码、原始训练数据或训练好的 3DGS
 结果。无需同步旧项目，也不得整体恢复归档。
@@ -117,7 +137,7 @@ episode、数组、report 与 browser bundle。两者都不是模型源码、原
 | `DEC-001` | 确定新项目许可证、claim policy 和归档移植权限 | 已确认：当前私有、all rights reserved；PR-00 全新实现、零归档移植，只允许 synthetic contract/坐标/重投影窄声明 |
 | `ADR-001` | 冻结 Stage-0 最小预览栈；训练/模型栈后续另决策 | `docs/adr/0001-stage-0-preview-stack.md` 与 `AGENTS.md` 命令一致 |
 | `ADR-002` | 记录已选 contract 与 Web-first 工具链，并冻结 CI 和精确验证命令 | 已完成：lockfile、CI 与 `AGENTS.md` 使用一致的 `npm run check` |
-| `RES-001` | 持续核验 `PR-01/PR-03` 所需外部来源 | 不阻塞纯 synthetic 的 `PR-00`；进入相应数据 PR 前必须完成 |
+| `RES-001` | 持续核验 `PR-01/PR-03` 所需外部来源 | ManiSkill 3.0.1 上游审计、runtime、snapshot/RNG fork 与 programmatic CPU primitive action/contact 已通过；隔离 production tooling 已批准待实现；robot controller、render/GPU 与其他来源仍待验证/批准 |
 
 Owner 已明确批准的 Stage-0 页面是前置可见切片，不改变核心门：不得由此偷跑 schema、训练
 框架、原始数据集下载或模型训练。
@@ -155,8 +175,8 @@ points 和 12 个数组资源；episode SHA-256 为
 和 14 类预注册负例通过，因此窄假设 verdict 为 `supported`。
 
 **证据边界**：该结果未使用外部数据或旧归档，只支持 synthetic contract、坐标链和独立
-重投影门；不支持真实数据、Gaussian 重建、世界模型、动力学或规划价值。代码当前尚未提交，
-远端 GitHub Actions 尚未运行，不能把本地 verdict 写成提交/集成完成。
+重投影门；不支持真实数据、Gaussian 重建、世界模型、动力学或规划价值。代码已由提交
+`b4107fa` 固化；远端 GitHub Actions 尚未运行，不能写成远端集成完成。
 
 ## 3. PR 结果语义
 
@@ -284,7 +304,63 @@ point 的 2D Euclidean pixel error，并取最大值。Manifest 中的 primary p
 除声明的干预外不改变初态、相机、光照、物理参数或随机状态。ManiSkill 是当前候选，不是
 预先锁定的来源。
 
+**RES-001 当前裁决**
+
+- `verified_upstream_fact`：ManiSkill 固定候选为 `3.0.1` / release commit `a4a4f92`；PyPI
+  wheel 为 `101.7 MB`，SHA-256 已登记在 `REFERENCES.md`。
+- `verified_upstream_fact`：`get_state_dict` / `set_state_dict` / `reset_to_env_states` 提供必要
+  fork API，但官方明确 state 不包含固定相机、纹理、controller stiffness 等全部变量；当前
+  narrow approval 来自下述本地 pilots，不来自 API 存在本身。
+- 许可门：框架/rigid environments 与 CC BY-NC assets 分账；primary pilot 只用程序化
+  primitive，禁止自动下载 asset/demo/dataset。
+- 本机 Linux + NVIDIA 16 GB GPU 满足官方优先平台；Owner 宿主终端已通过 Torch CUDA tensor
+  probe，固定 runtime 占 `5,741 MiB`，空资产目录得到复核。Vulkan 和 ManiSkill simulator/render
+  尚未实测；上游也没有发布最低 RAM/VRAM 数字。
+- 当前状态：Owner 已批准 A，并允许 GPU compute runtime；CPython 3.12 / wheel-only 的 `A-0`
+  因 `mplib -> toppra` 无匹配 `cp312` wheel 而 `failed_setup`；CPython 3.10.20 的 `A-1` 为
+  `verified_local_runtime`。固定 CPU/no-render snapshot pilot 的唯一 endpoint 为 `supported`：
+  五 sibling full hash 相同，且两个独立进程 evidence hash 一致。
+- PR-01 首个 programmatic CPU primitive external-force action/contact gate 也为 `supported`：
+  canonical/reverse 两个进程的稳定 evidence hash 一致，五 branch 的 pre-action state/RNG、
+  executed ledger、final physical state 和 contact trace 均逐项可复现；四个 push 的 paired
+  主轴位移越过运行前冻结的 `0.005 m` 门，110-step contact/settling checks 通过。该结果把
+  ManiSkill 提升为 `approved_pr01_primitive_cpu_push_source`，不等于完整 PR-01 已通过。
+- PR-01B production runtime 本地门为 `supported`：`sim/uv.lock` 固定 103 个解析条目，外部依赖
+  从全新临时 venv 经 wheel-only 门安装；10 个 runtime 行为测试与 canonical/reverse 两个真实
+  offline 进程通过，稳定 evidence SHA-256 为 `8a2013f1…71cb0`。远端 CI 尚未运行。
+- PR-01C writer 本地门为 `supported`：22 个 Python 行为/负例测试通过，真实 canonical/reverse golden
+  group 的稳定 evidence SHA-256 均为 `d25a635c…2dfb4`；五个 branch 各有 111 条 trajectory
+  与 110 条 contact records。该结果只支持单 group 原子幂等发布。
+- PR-01D independent audit 本地门为 `supported`：重新生成真实 golden group 后，14 个 hard
+  gates 与 11 个 mutation cases 全部通过；该切片不替代正式 cohort 或远端 CI。
+- PR-01E formal cohort 本地门为 `supported`：保留 provisional threshold rejection 后，冻结
+  preflight 与正式 48 groups / 240 episodes 全部通过；split 为 24/12/12，0 failed/extra attempts，
+  最近一次正式运行在 126.24 秒、41,403,093 bytes 与 808,157,184 bytes RSS 内通过独立 audit。
+  单次 audit report 含运行时 attempt/index hashes，不作为跨运行常量。
+- PR-01F Delivery 已实现无 RGB 五联状态回放、机器/人类报告、全量 checksum、`accept-pr01` 和
+  GitHub Actions job。正式 spec 记录 runtime source-commit policy，运行时注入当前 HEAD；builder、
+  verifier 与入口都会拒绝 dirty checkout。当前 PR-01 文件未提交，因此该负例正确触发，最终 SHA
+  的 clean-checkout `supported` 与远端 CI 尚未完成。
+- 已确认的负边界：`reset_to_env_states` 只恢复 physical state，不恢复 ManiSkill RNG；PR-01
+  adapter 必须显式 capture/restore main/episode RNG 并把它纳入 snapshot hash。
+  Rendering、外部 asset、demo 和 dataset 不在该授权内；具体 guardrail 和本机容量快照只在
+  `REFERENCES.md` 维护。
+
 **最小范围**
+
+PR-01 作为一个验收里程碑，内部依赖和停止门如下：
+
+| 切片 | 可证伪假设 | 核心交付 | 合并门 / 停止条件 |
+| --- | --- | --- | --- |
+| `PR-01A Contract` | `0.2.0` 能无歧义承载 sibling evidence | 四份 Schema、ADR-003、正负 fixtures、精确版本分派 | `0.1.0` 零改动；未知字段、错误版本、路径穿越、NaN 全拒绝 |
+| `PR-01B Runtime` | pilot runtime 能成为可复现生产工具链 | 精确 lock、隔离 `sim` extra、真实 smoke、CI job | clean install；真实 smoke 不得 skip；许可/runner 不满足停止 |
+| `PR-01C Writer` | 单 group 能稳定写出五个合法 branch | adapter、原子幂等 writer、attempt ledger、golden group | canonical/reverse semantic digest 相同；中途失败不发布 episode |
+| `PR-01D Audit` | 独立审计器能识别所有协议污染 | evaluator、四态 report、mutation 负例 | 不导入 writer；每个负例命中稳定 status/reason code |
+| `PR-01E Cohort` | 固定 cohort 能在预算内无泄漏生成 | preflight、experiment spec、group-first split、正式 cohort | 每组五动作完整；无跨 split lineage；超预算 fail closed |
+| `PR-01F Delivery` | clean checkout 能一键产出可验收证据 | 无 RGB 五联 Demo、报告、checksums、`accept-pr01`、远端 CI | 最终 commit SHA 的 CI `supported`；本地成功不能替代 |
+
+准确动态进度见 [`state/pr-queue.md`](state/pr-queue.md)，稳定架构边界见
+[`adr/0003-pr01-sibling-evidence-stack.md`](adr/0003-pr01-sibling-evidence-stack.md)。
 
 每个起点的 primary push cohort：
 
@@ -313,6 +389,26 @@ contact_events
 reset_seed
 ```
 
+这些概念分别落入 `0.2.0` episode/experiment/attempt/invariance-report。Sibling group 内唯一
+允许变化的输入是 `/intervention/commanded_action`；trajectory、contact、terminal state 和
+settling 是干预结果，允许随 branch 改变。
+
+正式 cohort 固定为：
+
+```text
+2 object specs × 3 layouts × 2 start poses × 4 reset seeds
+= 48 sibling groups × 5 actions = 240 episodes
+```
+
+每个 `(object, layout, start)` stratum 内将四个 seed 按稳定 SHA-256 排序，以 `2/1/1` 分到
+train/validation/test，得到 `24/12/12 groups`。Preflight 使用独立 reserved seeds 和一个 start
+pose，固定为 `12 groups / 60 episodes`，只冻结 timeout、effect/contact/settling thresholds、
+p95 runtime、p95 artifact size 和正式资源预算，不进入 formal cohort。
+
+每 branch 最多重试一次，正式 cohort 总额外 attempts 不超过 12。只有 simulator crash、startup
+timeout 和 atomic write failure 可以重试；无 contact、未 settling 或 action mismatch 属于科学
+失败，不得换 seed、删 group、截断或重试为成功。
+
 **裁决门**
 
 - 干预前状态、相机、光照、随机种子和未声明物性一致。
@@ -333,8 +429,10 @@ cohort invariance，只阻塞该 secondary cohort，不为凑六分屏放宽 pri
 
 **Demo**
 
-primary push cohort 用五联分屏回放；secondary 区域单独并排显示 `grasp/lift` 与其
-duration-matched hold，并显示各自 lineage diff。
+Primary push cohort 使用无 RGB 五联状态回放：五个 branch 共享坐标系和时间轴，以 Canvas/SVG
+显示对象、action vector、trajectory、contact point/normal/impulse、settling 和 snapshot/RNG
+hash，并支持统一播放、暂停和拖动。页面只消费已审计 episode，不运行 simulator、不使用 CDN、
+外部资产或 GPU。Machine report 才是验收事实源。
 
 ## 6. PR-02：ObjectState-only 动力学基线
 
@@ -787,7 +885,12 @@ demo command
 | PR | 建议分支 | 单一责任域 |
 | --- | --- | --- |
 | `PR-00` | `pr/00-core-contracts` | contracts、frames、projection、episode viewer |
-| `PR-01` | `pr/01-maniskill-siblings` | approved simulator adapter、sibling writer、invariance |
+| `PR-01A` | `pr/01a-sibling-contract` | `0.2.0` contract、fixtures、version dispatch |
+| `PR-01B` | `pr/01b-sim-runtime` | isolated production runtime lock、smoke、CI |
+| `PR-01C` | `pr/01c-sibling-writer` | simulator adapter、atomic writer、attempt ledger |
+| `PR-01D` | `pr/01d-invariance-audit` | independent audit、four-state report、mutations |
+| `PR-01E` | `pr/01e-formal-cohort` | preflight、group-first split、formal cohort |
+| `PR-01F` | `pr/01f-sibling-delivery` | state replay、report/checksums、accept command、CI |
 | `PR-02` | `pr/02-state-dynamics` | state baselines、action-conditioned dynamics、metrics |
 | `PR-03` | `pr/03-canonical-gaussian` | canonical representation、fusion、renderer evaluation |
 | `PR-04` | `pr/04-gaussian-ablation` | controlled representation ablation 与决策报告 |
@@ -804,8 +907,8 @@ demo command
 实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A。新项目当前保持私有并按
 all rights reserved 管理；对外发布前重新决策许可证。以下前置决策仍未完成：
 
-- 未来训练栈、长期目录和数据落盘格式；
-- 首阶段磁盘、下载、算力和最长验收时间预算；
+- PR-02 之后的训练栈和长期模型目录；
+- PR-01 正式磁盘、算力和最长验收时间预算（由隔离 preflight 实测冻结）；
 - 各 PR 的正式数值阈值、统计检验和资源预算；
 - 目标机器人、动作空间、控制频率和安全规范。
 
@@ -816,10 +919,13 @@ Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的
 当前工作区无需同步旧仓库。顺序更新为：
 
 1. Stage-0 已由 `c1927b1` 提交；继续保持外部审计样例 ignored，不推送数据。
-2. `PR-00` Decision Freeze、ADR-002、唯一 schema、producer、evaluator、Web consumer、CI 和
-   本地 `supported` report 已完成；Owner 先评审当前 diff 与证据，再单独决定是否授权 commit。
-3. Commit 授权前不执行提交、push 或 PR 创建；远端 GitHub Actions 只有实际运行后才能记为
-   CI 证据。
-4. `PR-00` 窄 verdict 已解除 `PR-01`、`PR-03` 和 `PR-05` 的 contract 依赖，但不自动批准数据
-   下载、训练栈或实现范围。下一阶段先完成相应 `RES-001` 上游/许可/预算审核，再为选定的
-   单一假设冻结 endpoint 和实现 contract。
+2. `PR-00` 已由 `b4107fa` 提交；不 push，远端 GitHub Actions 只有实际运行后才能记为 CI
+   证据。
+3. RES-001 已完成 ManiSkill `3.0.1` 的上游版本、wheel/hash、许可、snapshot/reset 和平台审计；
+   Owner 已批准 A 并允许 GPU compute runtime；CPython 3.12 的 `A-0` 已在 resolver 阶段失败，
+   CPython 3.10.20 的 `A-1` 已通过安装、import、宿主 GPU probe、freeze、磁盘和空资产检查。
+4. Snapshot/RNG fork 与 programmatic CPU primitive action/contact gate 都已用两个独立进程
+   `supported`；后者只批准 PR-01 primitive push source。
+5. PR-01A–E 已在本地门支持，PR-01F 的无 RGB 五联回放、checksums、一键验收与 clean-head
+   lineage guard 已实现；整批仍未提交。下一步是范围复核、取得 Owner 动作级 commit 授权，
+   在最终 SHA 的 clean checkout 重跑 `accept-pr01`，再由远端 CI 裁决完成门。

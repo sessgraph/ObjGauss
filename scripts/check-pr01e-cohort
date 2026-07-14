@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_ROOT="$ROOT/sim"
+OUTPUT_ROOT="$ROOT/generated/pr01e"
+NODE_BIN="${OBJGAUSS_NODE:-node}"
+cd "$ROOT"
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+
+OBJGAUSS_NODE="$NODE_BIN" ./scripts/check-pr01e-preflight
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/formal.XXXXXX")"
+VENV="$WORK_ROOT/venv"
+ASSET_DIR="$WORK_ROOT/no-assets"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+mkdir "$ASSET_DIR" "$WORK_ROOT/xdg-cache" "$WORK_ROOT/mpl-cache"
+chmod 0555 "$ASSET_DIR"
+export UV_PROJECT_ENVIRONMENT="$VENV"
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev --no-install-project --no-build
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev
+
+export OBJGAUSS_REPO_ROOT="$ROOT"
+export OBJGAUSS_NODE="$NODE_BIN"
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export UV_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export MS_ASSET_DIR="$ASSET_DIR"
+export XDG_CACHE_HOME="$WORK_ROOT/xdg-cache"
+export MPLCONFIGDIR="$WORK_ROOT/mpl-cache"
+unset MS_SKIP_ASSET_DOWNLOAD_PROMPT || true
+
+"$VENV/bin/python" -m unittest discover -s "$SIM_ROOT/tests" -p 'test_cohort.py'
+"$NODE_BIN" scripts/validate-pr01-document.mjs contracts/fixtures/pr01e/experiment.formal.json
+"$VENV/bin/objgauss-pr01-cohort" \
+  --mode formal \
+  --output-root "$WORK_ROOT/evidence" \
+  --report "$WORK_ROOT/cohort-report.json" \
+  --spec contracts/fixtures/pr01e/cohort-spec.json \
+  --experiment contracts/fixtures/pr01e/experiment.formal.json \
+  --lock sim/uv.lock \
+  --validator scripts/validate-pr01-document.mjs \
+  --node "$NODE_BIN" \
+  --source-commit "$SOURCE_COMMIT"
+
+rm -rf -- "$OUTPUT_ROOT/formal"
+mv "$WORK_ROOT/evidence" "$OUTPUT_ROOT/formal"
+cp "$WORK_ROOT/cohort-report.json" "$OUTPUT_ROOT/formal/cohort-report.json"
+
+"$NODE_BIN" src/pr01/audit/cli.mjs \
+  --root generated/pr01e/formal \
+  --manifest contracts/fixtures/pr01e/experiment.formal.json \
+  --negative-cases generated/pr01d/negative-cases.json \
+  --output generated/pr01e/formal/audit-report.json \
+  --human generated/pr01e/formal/audit-report.md \
+  --checksums generated/pr01e/formal/checksums.sha256
+
+cat "$OUTPUT_ROOT/formal/cohort-report.json"

@@ -1,0 +1,38 @@
+{
+  "spec_version": "0.1.0",
+  "experiment_id": "pr01e-primitive-cohort-v0",
+  "fixture_id": "pr01e-formal-v0",
+  "source_commit": "b4107fa4fb2747294daf616a01bede8def99a378",
+  "asset_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "object_specs": {
+    "box-a": {
+      "half_size_m": [0.03, 0.02, 0.025],
+      "density_kg_m3": 500.0
+    },
+    "box-b": {
+      "half_size_m": [0.025, 0.025, 0.03],
+      "density_kg_m3": 450.0
+    }
+  },
+  "layouts": {
+    "layout-a": { "context_xy_m": [0.55, 0.55] },
+    "layout-b": { "context_xy_m": [-0.55, 0.55] },
+    "layout-c": { "context_xy_m": [0.55, -0.55] }
+  },
+  "start_poses": {
+    "start-a": { "target_base_xy_m": [0.0, 0.0], "target_jitter_m": 0.02 },
+    "start-b": { "target_base_xy_m": [0.12, -0.1], "target_jitter_m": 0.02 }
+  },
+  "formal_reset_seeds": [24071401, 24071402, 24071403, 24071404],
+  "preflight_reset_seeds": [24071501, 24071502],
+  "preflight_start_pose_ids": ["start-a"],
+  "split_algorithm": "sha256-seed-rank-v1",
+  "split_allocation": { "train": 2, "validation": 1, "test": 1 },
+  "thresholds": {
+    "hold_horizontal_drift_max_m": 0.002,
+    "directional_effect_min_m": 0.005,
+    "strong_over_weak_min_m": 0.005,
+    "final_linear_speed_max_m_s": 0.01,
+    "final_angular_speed_max_rad_s": 0.01
+  }
+}

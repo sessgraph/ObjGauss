@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT_ROOT="$ROOT/generated/pr01d"
+NODE_BIN="${OBJGAUSS_NODE:-node}"
+cd "$ROOT"
+
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+
+OBJGAUSS_NODE="$NODE_BIN" ./scripts/check-pr01c-writer
+rm -rf -- "$OUTPUT_ROOT"
+mkdir -p "$OUTPUT_ROOT"
+
+"$NODE_BIN" scripts/run-pr01d-mutations.mjs \
+  generated/pr01c/golden \
+  contracts/fixtures/pr01c/experiment.valid.json \
+  generated/pr01d/negative-cases.json \
+  generated/pr01d
+
+"$NODE_BIN" src/pr01/audit/cli.mjs \
+  --root generated/pr01c/golden \
+  --manifest contracts/fixtures/pr01c/experiment.valid.json \
+  --negative-cases generated/pr01d/negative-cases.json \
+  --output generated/pr01d/audit-report.json \
+  --human generated/pr01d/audit-report.md \
+  --checksums generated/pr01d/checksums.sha256
+
+"$NODE_BIN" scripts/validate-pr01-document.mjs generated/pr01d/audit-report.json
+"$NODE_BIN" --test tests/pr01d-audit.test.mjs
+"$NODE_BIN" scripts/check-syntax.mjs
+cat generated/pr01d/audit-report.json
