@@ -1,20 +1,36 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and virtual environments
 .venv/
+venv/
 node_modules/
-__pycache__/
-*.py[cod]
+
+# Build, test, and tool output
+build/
+dist/
+coverage/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-playwright-report/
-.playwright-mcp/
-test-results/
-dist/
-build/
+__pycache__/
+*.py[cod]
 *.egg-info/
-data/
+*.log
+
+# Data and model artifacts
 outputs/
-*.ply
-*.splat
-!tests/fixtures/*.ply
-public/models/objectstate-model-demo-local/
-public/models/objectstate-multi-object-m2-local/
+data/
+datasets/
+checkpoints/
+runs/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*~
