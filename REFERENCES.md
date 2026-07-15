@@ -33,7 +33,7 @@ Owner 于 2026-07-14 明确要求看到渲染后的 3D Gaussian，而不是 note
 | 上游文件 | `GitHubDragonFly/GitHubDragonFly.github.io` 的 `viewers/examples/legobrick.splat` |
 | 固定版本 | commit `1267e2135660e1f4197f94c045453fe40c209b0e` |
 | 固定 URL | <https://raw.githubusercontent.com/GitHubDragonFly/GitHubDragonFly.github.io/1267e2135660e1f4197f94c045453fe40c209b0e/viewers/examples/legobrick.splat> |
-| 获取命令 | `bash scripts/fetch-gaussian-preview.sh`；已有文件复用前与新下载落盘前均校验大小和 SHA-256 |
+| 获取与验证命令 | `bash scripts/fetch-gaussian-preview.sh`，随后运行 `npm run test:preview`；获取脚本在已有文件复用前与新下载落盘前校验大小和 SHA-256，专项测试再校验记录数和严格解析；clean-checkout `npm run check` 不依赖该 ignored 外部文件 |
 | 本地位置 | `data/local-preview/legobrick-1267e213/legobrick.splat`（Git ignored） |
 | 大小与记录数 | `3,297,920` bytes；`103,060` 条固定长度记录 |
 | SHA-256 | `d5131a664a12a8764da70552c85f567d276313110f63f1efd48424845917899e` |

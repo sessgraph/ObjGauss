@@ -45,9 +45,12 @@ records，组成可环绕、平移、移动和缩放的环境级 Gaussian scene�
 
 ```bash
 bash scripts/fetch-gaussian-preview.sh
+npm run test:preview
 ```
 
-该外部文件只保存到 ignored `data/`，其 asset provenance 仍为 `unverified`。Stage-0 只证明
+获取脚本先校验固定大小和 SHA-256；专项测试再校验记录数与严格解析。该测试显式依赖 ignored
+外部文件，不属于必须在无外部资产 clean checkout 中成立的 `npm run check`。该文件只保存到
+ignored `data/`，其 asset provenance 仍为 `unverified`。Stage-0 只证明
 本地 WebGL2 Gaussian 渲染链可见，不是 `PR-00` episode，也不构成任何模型或研究门证据。
 准确资源与许可边界见 [`REFERENCES.md`](REFERENCES.md)，局部渲染决策见
 [`docs/adr/0001-stage-0-preview-stack.md`](docs/adr/0001-stage-0-preview-stack.md)。

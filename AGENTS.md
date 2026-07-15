@@ -194,6 +194,7 @@
 | 运行时 | Node 24.18.0；版本源为 .node-version |
 | 安装/同步依赖 | npm ci |
 | 获取 Stage-0 固定预览 | bash scripts/fetch-gaussian-preview.sh |
+| 验证 Stage-0 固定外部预览 | `npm run test:preview`；显式要求已下载的 ignored 文件，不属于无外部资产的 clean-checkout `npm run check` |
 | 启动 Web 页面 | python3 -m http.server 8000 --bind 127.0.0.1；PR-00 打开 http://127.0.0.1:8000/viewer/?mode=contract，Stage-0 打开 /viewer/，PR-01 验收后打开 /artifacts/pr01/demo/ |
 | 行为与负例测试 | npm test |
 | 语法检查 | npm run syntax |

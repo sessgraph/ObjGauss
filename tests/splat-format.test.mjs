@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   MAX_ABS_POSITION,
@@ -14,10 +12,6 @@ import {
   decodeQuaternionBytes,
   parseSplatV1,
 } from "../viewer/splat-format.mjs";
-
-const EXPECTED_LEGOBRICK_BYTES = 3_297_920;
-const EXPECTED_LEGOBRICK_RECORDS = 103_060;
-const EXPECTED_LEGOBRICK_SHA256 = "d5131a664a12a8764da70552c85f567d276313110f63f1efd48424845917899e";
 
 function record({
   position = [1.25, -2.5, 3.75],
@@ -119,18 +113,4 @@ test("rejects malformed covariance inputs", () => {
   assert.throws(() => covarianceFromScaleQuaternion([1, 1, 1], [0, 0, 0, 0]), /non-zero/);
   assert.throws(() => covarianceFromScaleQuaternion([1, 1, 1], [NaN, 0, 0, 1]), /finite/);
   assert.throws(() => decodeQuaternionBytes(256, 128, 128, 128), /\[0, 255\]/);
-});
-
-test("the ignored legobrick fixture has the pinned bytes, records, and SHA-256", () => {
-  const path = "data/local-preview/legobrick-1267e213/legobrick.splat";
-  assert.ok(existsSync(path), `missing fixture: ${path}`);
-
-  const bytes = readFileSync(path);
-  assert.equal(bytes.byteLength, EXPECTED_LEGOBRICK_BYTES);
-  assert.equal(bytes.byteLength / SPLAT_RECORD_BYTES, EXPECTED_LEGOBRICK_RECORDS);
-  assert.equal(createHash("sha256").update(bytes).digest("hex"), EXPECTED_LEGOBRICK_SHA256);
-
-  const parsed = parseSplatV1(bytes);
-  assert.equal(parsed.count, EXPECTED_LEGOBRICK_RECORDS);
-  assert.equal(parsed.visibleCount, EXPECTED_LEGOBRICK_RECORDS);
 });

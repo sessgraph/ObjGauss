@@ -11,6 +11,7 @@
     "build:pr01f": "node scripts/build-pr01-delivery.mjs",
     "contract:audit": "node scripts/audit-pr00.mjs",
     "contract:pr01a": "node scripts/audit-pr01a.mjs",
+    "test:preview": "node --test tests/external/gaussian-preview.test.mjs",
     "test:pr01d": "node --test tests/pr01d-audit.test.mjs",
     "test:pr01f": "node --test tests/pr01f-delivery.test.mjs",
     "test": "node --test tests/*.test.mjs",
