@@ -11,11 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NoReturn
 
+from .canonical import CanonicalHashError, canonical_sha256, canonical_sha256s
 from .runtime import atomic_write, file_sha256, strict_json_bytes
 
 
 REPORT_VERSION = "0.1.0"
 REPORT_KIND = "objgauss.pr02c-loader-report"
+INPUT_BUNDLE_VERSION = "0.1.0"
+INPUT_BUNDLE_KIND = "objgauss.pr02c-model-input-bundle"
 ALLOWED_SPLITS = ("train", "validation")
 BRANCH_IDS = (
     "hold",
@@ -83,6 +86,13 @@ class TrainingLabels:
 
 
 @dataclass(frozen=True)
+class SourceEpisodeReference:
+    uri: str
+    sha256: str
+    lineage_sha256: str
+
+
+@dataclass(frozen=True)
 class BranchSample:
     group_id: str
     split: str
@@ -90,6 +100,7 @@ class BranchSample:
     model_inputs: ModelInputs
     labels: TrainingLabels
     semantic_sha256: str
+    source_episode: SourceEpisodeReference
 
 
 @dataclass(frozen=True)
@@ -279,6 +290,7 @@ def _semantic_sha(publication: dict[str, Any]) -> str:
 
 def load_branch(
     *,
+    repo_root: Path,
     data_root: Path,
     directory: Path,
     group_id: str,
@@ -346,6 +358,15 @@ def load_branch(
     inputs = build_model_inputs(episode, trajectory)
     payload = model_payload(inputs)
     labels = build_labels(trajectory)
+    episode_uri = (directory / "episode.json").resolve().relative_to(
+        repo_root.resolve()
+    ).as_posix()
+    lineage_document = {
+        "source_commit": source_commit,
+        "source_plan_sha256": source_plan_sha256,
+        "episode_sha256": publication["episode_sha256"],
+        "semantic_sha256": publication["semantic_sha256"],
+    }
     sample = BranchSample(
         group_id=group_id,
         split=split,
@@ -353,6 +374,11 @@ def load_branch(
         model_inputs=inputs,
         labels=labels,
         semantic_sha256=publication["semantic_sha256"],
+        source_episode=SourceEpisodeReference(
+            uri=episode_uri,
+            sha256=publication["episode_sha256"],
+            lineage_sha256=sha256_bytes(strict_json_bytes(lineage_document)),
+        ),
     )
     index = {
         "group_id": group_id,
@@ -454,6 +480,7 @@ def load_dataset(
         initializations = []
         for branch_id in BRANCH_IDS:
             branch, branch_index, payload = load_branch(
+                repo_root=repo_root,
                 data_root=data_root,
                 directory=directory / branch_id,
                 group_id=group_id,
@@ -531,6 +558,146 @@ def load_dataset(
     return tuple(groups), report
 
 
+def build_model_input_bundle(
+    *,
+    repo_root: Path,
+    groups: tuple[GroupSample, ...],
+    loader_report: dict[str, Any],
+    source_commit: str,
+    node: str,
+) -> dict[str, Any]:
+    samples: list[dict[str, Any]] = []
+    for group in groups:
+        if group.split != "validation":
+            continue
+        for branch in group.branches:
+            inputs = branch.model_inputs
+            initial_object_states = [
+                {
+                    "object_id": state.actor_id,
+                    "position_W_m": list(state.position_W_m),
+                    "quaternion_WO_wxyz": list(state.quaternion_WO_wxyz),
+                    "linear_velocity_W_m_s": list(state.linear_velocity_W_m_s),
+                    "angular_velocity_W_rad_s": list(state.angular_velocity_W_rad_s),
+                }
+                for state in inputs.initial_object_states
+            ]
+            commanded_action = {
+                "kind": inputs.commanded_action.kind,
+                "vector_W_N": list(inputs.commanded_action.vector_W_N),
+                "duration_s": inputs.commanded_action.duration_s,
+                "sim_frequency_hz": inputs.commanded_action.sim_frequency_hz,
+                "applied_steps": inputs.commanded_action.applied_steps,
+            }
+            samples.append(
+                {
+                    "group_id": branch.group_id,
+                    "branch_id": branch.branch_id,
+                    "split": branch.split,
+                    "source_episode": {
+                        "uri": branch.source_episode.uri,
+                        "media_type": "application/json",
+                        "sha256": branch.source_episode.sha256,
+                        "schema_version": "0.2.0",
+                        "lineage_sha256": branch.source_episode.lineage_sha256,
+                    },
+                    "initial_objectstate_sha256": "",
+                    "commanded_action_sha256": "",
+                    "target_object_id": inputs.target_object_id,
+                    "initial_object_states": initial_object_states,
+                    "commanded_action": commanded_action,
+                    "rollout_times_s": list(inputs.rollout_times_s),
+                }
+            )
+    samples.sort(key=lambda item: (item["group_id"], item["branch_id"]))
+    if len(samples) != 60:
+        raise DataInvalidError("validation input bundle must contain exactly 60 branches")
+    hashes = canonical_sha256s(
+        node,
+        [
+            value
+            for sample in samples
+            for value in (sample["initial_object_states"], sample["commanded_action"])
+        ],
+    )
+    hash_by_identity = {
+        (sample["group_id"], sample["branch_id"]): (hashes[index], hashes[index + 1])
+        for index, sample in zip(range(0, len(hashes), 2), samples, strict=True)
+    }
+    for sample in samples:
+        initial_sha256, command_sha256 = hash_by_identity[
+            (sample["group_id"], sample["branch_id"])
+        ]
+        sample["initial_objectstate_sha256"] = initial_sha256
+        sample["commanded_action_sha256"] = command_sha256
+    bundle = {
+        "bundle_version": INPUT_BUNDLE_VERSION,
+        "bundle_kind": INPUT_BUNDLE_KIND,
+        "source_commit": source_commit,
+        "experiment_id": "pr02-objectstate-baseline-v0",
+        "split": "validation",
+        "inputs": {
+            **loader_report["inputs"],
+            "data_index_sha256": loader_report["data_index_sha256"],
+            "model_input_index_sha256": loader_report["model_input_index_sha256"],
+            "loader_report_sha256": sha256_bytes(strict_json_bytes(loader_report)),
+            "runtime_lock_sha256": file_sha256(repo_root / "learning/uv.lock"),
+        },
+        "samples": samples,
+        "sample_payload_sha256": canonical_sha256(node, samples),
+        "isolation": {
+            "visible_fields": [
+                "initial_objectstate",
+                "commanded_action_schedule",
+                "non_future_metadata",
+            ],
+            "executed_action_is_feature": False,
+            "gt_future_read": False,
+            "test_materialized": False,
+        },
+        "claim_boundary": {
+            "supported_claim": "sanitized-validation-model-inputs-are-published",
+            "excluded_claims": [
+                "prediction-produced",
+                "trainer-implemented",
+                "model-performance",
+                "scientific-baseline-comparison",
+            ],
+        },
+    }
+    assert_model_input_bundle(bundle, node=node)
+    return bundle
+
+
+def assert_model_input_bundle(bundle: Any, *, node: str) -> None:
+    if not isinstance(bundle, dict):
+        raise DataInvalidError("model input bundle must be an object")
+    forbidden = FORBIDDEN_MODEL_FIELDS | {"labels", "training_labels"}
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in forbidden:
+                    raise DataInvalidError(f"forbidden model input bundle field: {key}")
+                walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item)
+
+    walk(bundle.get("samples"))
+    if bundle.get("bundle_kind") != INPUT_BUNDLE_KIND:
+        raise DataInvalidError("model input bundle kind drift")
+    if bundle.get("split") != "validation":
+        raise DataInvalidError("model input bundle split must be validation")
+    samples = bundle.get("samples")
+    if not isinstance(samples, list) or len(samples) != 60:
+        raise DataInvalidError("model input bundle sample count drift")
+    if any(sample.get("split") != "validation" for sample in samples):
+        raise DataInvalidError("model input bundle contains a forbidden split")
+    if bundle.get("sample_payload_sha256") != canonical_sha256(node, samples):
+        raise DataInvalidError("model input bundle payload checksum drift")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
@@ -541,6 +708,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--splits", nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--model-input-output", type=Path)
+    parser.add_argument("--node", default="node")
     return parser.parse_args(argv)
 
 
@@ -550,7 +719,7 @@ def main(argv: list[str] | None = None) -> int:
     resolve = lambda path: path if path.is_absolute() else repo_root / path
     output = resolve(args.output)
     try:
-        _, report = load_dataset(
+        groups, report = load_dataset(
             repo_root=repo_root,
             data_root=resolve(args.data_root).resolve(),
             manifest_path=resolve(args.manifest).resolve(),
@@ -559,8 +728,19 @@ def main(argv: list[str] | None = None) -> int:
             source_commit=args.source_commit,
             splits=require_splits(args.splits),
         )
+        if args.model_input_output is not None:
+            bundle = build_model_input_bundle(
+                repo_root=repo_root,
+                groups=groups,
+                loader_report=report,
+                source_commit=args.source_commit,
+                node=args.node,
+            )
+            atomic_write(
+                resolve(args.model_input_output), strict_json_bytes(bundle)
+            )
         exit_code = 0
-    except DataBlockedError as error:
+    except (CanonicalHashError, DataBlockedError) as error:
         report = {
             "report_version": REPORT_VERSION,
             "report_kind": REPORT_KIND,

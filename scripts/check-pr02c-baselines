@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LEARNING_ROOT="$ROOT/learning"
+OUTPUT_ROOT="$ROOT/generated/pr02c"
+PUBLISH_ROOT="$OUTPUT_ROOT/baselines"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  printf 'invalid: PR-02C C2 acceptance requires a clean checkout\n' >&2
+  exit 4
+fi
+if [[ -n "${OBJGAUSS_NODE:-}" ]]; then
+  NODE_BIN="$OBJGAUSS_NODE"
+elif [[ "$(node --version 2>/dev/null || true)" == "v24.18.0" ]]; then
+  NODE_BIN="$(command -v node)"
+elif [[ -x "$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node" ]]; then
+  NODE_BIN="$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node"
+else
+  printf 'blocked: Node v24.18.0 is unavailable\n' >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+export OBJGAUSS_NODE="$NODE_BIN"
+export PYTHONDONTWRITEBYTECODE=1
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/baselines.XXXXXX")"
+LEARNING_VENV="$WORK_ROOT/learning-venv"
+BUNDLE="$WORK_ROOT/model-input-bundle.json"
+LOADER_REPORT="$WORK_ROOT/loader-report.json"
+CANONICAL="$WORK_ROOT/canonical"
+REVERSE="$WORK_ROOT/reverse"
+MUTATION="$WORK_ROOT/mutation"
+PUBLISH="$WORK_ROOT/publish"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+# Provision C2 before nested gates rotate their own environments. Locked package
+# installation is the only network-capable phase in this gate.
+export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev
+
+./scripts/check-pr02c-data
+
+export UV_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+npm run check
+"$LEARNING_VENV/bin/python" -m unittest discover \
+  -s "$LEARNING_ROOT/tests" -p 'test_*.py' -v
+"$NODE_BIN" --test tests/pr02c-baselines.test.mjs
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+"$LEARNING_VENV/bin/objgauss-pr02c-data" \
+  --repo-root "$ROOT" \
+  --data-root generated/pr02c/data \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --splits train validation \
+  --output "${LOADER_REPORT#"$ROOT/"}" \
+  --model-input-output "${BUNDLE#"$ROOT/"}" \
+  --node "$NODE_BIN"
+
+"$LEARNING_VENV/bin/objgauss-pr02c-baselines" \
+  --repo-root "$ROOT" \
+  --bundle "${BUNDLE#"$ROOT/"}" \
+  --output-root "${CANONICAL#"$ROOT/"}" \
+  --source-commit "$SOURCE_COMMIT" \
+  --node "$NODE_BIN" \
+  --order canonical
+"$LEARNING_VENV/bin/objgauss-pr02c-baselines" \
+  --repo-root "$ROOT" \
+  --bundle "${BUNDLE#"$ROOT/"}" \
+  --output-root "${REVERSE#"$ROOT/"}" \
+  --source-commit "$SOURCE_COMMIT" \
+  --node "$NODE_BIN" \
+  --order reverse
+
+"$NODE_BIN" scripts/verify-pr02c-baselines.mjs \
+  --root "${CANONICAL#"$ROOT/"}" \
+  --repeat-root "${REVERSE#"$ROOT/"}" \
+  --bundle "${BUNDLE#"$ROOT/"}" \
+  --loader-report "${LOADER_REPORT#"$ROOT/"}" \
+  --manifest learning/baseline-manifest.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --output "${CANONICAL#"$ROOT/"}/verification-report.json"
+
+# The independent verifier must reject a prediction whose bytes and state math
+# no longer match the published index/payload checksums.
+cp -a "$CANONICAL" "$MUTATION"
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+const root = process.argv[1];
+const index = JSON.parse(readFileSync(resolve(root, "index.json"), "utf8"));
+const path = resolve(root, index.predictions[0].uri);
+const document = JSON.parse(readFileSync(path, "utf8"));
+document.predictions[0].objects[0].position_W_m[0] += 1;
+writeFileSync(path, `${JSON.stringify(document)}\n`);
+' "${MUTATION#"$ROOT/"}"
+set +e
+"$NODE_BIN" scripts/verify-pr02c-baselines.mjs \
+  --root "${MUTATION#"$ROOT/"}" \
+  --repeat-root "${REVERSE#"$ROOT/"}" \
+  --bundle "${BUNDLE#"$ROOT/"}" \
+  --loader-report "${LOADER_REPORT#"$ROOT/"}" \
+  --manifest learning/baseline-manifest.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --output "${MUTATION#"$ROOT/"}/verification-report.json" >/dev/null
+MUTATION_EXIT=$?
+set -e
+if [[ "$MUTATION_EXIT" -ne 4 ]]; then
+  printf 'invalid: independent verifier accepted or mishandled a corrupted prediction\n' >&2
+  exit 4
+fi
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync } from "node:fs";
+const report = JSON.parse(readFileSync(process.argv[1], "utf8"));
+if (report.verdict !== "invalid" || !report.checks.some((item) => item.status === "invalid")) process.exit(4);
+' "${MUTATION#"$ROOT/"}/verification-report.json"
+rm -rf -- "$MUTATION"
+
+mv "$CANONICAL" "$PUBLISH"
+mv "$BUNDLE" "$LOADER_REPORT" "$PUBLISH/"
+(
+  cd "$PUBLISH"
+  find . -type f -print0 | sort -z | xargs -0 sha256sum > "$WORK_ROOT/checksums.sha256"
+)
+mv "$WORK_ROOT/checksums.sha256" "$PUBLISH/checksums.sha256"
+(
+  cd "$PUBLISH"
+  sha256sum --quiet -c checksums.sha256
+)
+
+rm -rf -- "$LEARNING_VENV" "$REVERSE"
+rm -rf -- "$PUBLISH_ROOT"
+mv "$PUBLISH" "$PUBLISH_ROOT"
+trap - EXIT
+rm -rf -- "$WORK_ROOT"
+
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync } from "node:fs";
+const report = JSON.parse(readFileSync("generated/pr02c/baselines/report.json", "utf8"));
+const verification = JSON.parse(readFileSync("generated/pr02c/baselines/verification-report.json", "utf8"));
+console.log(JSON.stringify({
+  verdict: verification.verdict,
+  source_commit: verification.source_commit,
+  groups: verification.counts.groups,
+  branches: verification.counts.branches,
+  predictions: verification.counts.predictions,
+  checks: verification.counts.checks,
+  semantic_index_sha256: report.semantic_index_sha256,
+  evidence_root: "generated/pr02c/baselines",
+}));
+'

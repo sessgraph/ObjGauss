@@ -1,0 +1,90 @@
+{
+  "manifest_version": "0.1.0",
+  "manifest_kind": "objgauss.pr02c-deterministic-baselines",
+  "arms": ["copy_state", "constant_velocity"],
+  "inference_boundary": {
+    "bundle_kind": "objgauss.pr02c-model-input-bundle",
+    "allowed_split": "validation",
+    "expected_groups": 12,
+    "branches_per_group": 5,
+    "expected_source_samples": 60,
+    "expected_predictions": 120,
+    "visible_fields": [
+      "initial_objectstate",
+      "commanded_action_schedule",
+      "non_future_metadata"
+    ],
+    "executed_action_is_feature": false,
+    "gt_future_read": false,
+    "test_materialized": false
+  },
+  "horizon": {
+    "unit": "physical_seconds",
+    "duration_s": 1.1,
+    "scoring_times_s": [0.1, 0.2, 0.5, 1.1]
+  },
+  "semantics": {
+    "copy_state": {
+      "position": "copy-initial",
+      "orientation": "copy-initial-and-canonicalize-sign",
+      "linear_velocity": "copy-initial",
+      "angular_velocity": "copy-initial"
+    },
+    "constant_velocity": {
+      "position": "position-0-plus-linear-velocity-W-times-absolute-time",
+      "orientation": "left-multiply-world-angular-velocity-exponential-and-canonicalize-sign",
+      "linear_velocity": "copy-initial",
+      "angular_velocity": "copy-initial"
+    },
+    "quaternion": {
+      "layout": "wxyz",
+      "frame": "quaternion-WO-with-angular-velocity-W",
+      "normalization": "unit-norm-required",
+      "canonical_sign": "first-component-with-absolute-value-above-1e-12-is-positive"
+    }
+  },
+  "frozen_inputs": {
+    "data_boundary_manifest": {
+      "path": "learning/data-boundary-manifest.json",
+      "sha256": "7fbb1f1635d542623bf34c78fcb59bd2be7f432e5193fbc04c25eb1476b01a7f"
+    },
+    "runtime_lock": {
+      "path": "learning/uv.lock",
+      "sha256": "a90c27d88e5e469593c608b1b865adab9fd57ac7e36dceb54256930fa8de7eb5"
+    },
+    "common_schema": {
+      "path": "contracts/objgauss/0.3.0/common.schema.json",
+      "sha256": "a40d0dc44303db092882af6b47de82a9d19c35a028ffacc33424476afba10fc4"
+    },
+    "prediction_schema": {
+      "path": "contracts/objgauss/0.3.0/dynamics-prediction.schema.json",
+      "sha256": "34866e6c27f0ba68fc40a1092ee6bf404122d1c67ec832d08817081c1467c7d9"
+    },
+    "formal_data_spec": {
+      "runtime_path": "generated/pr02b/evidence/freeze/formal-data-spec.json",
+      "sha256": "770d116b8f25cf1300497981d02a9d1243db7331cd302633db43e5c10f06ea63"
+    },
+    "dynamics_experiment": {
+      "runtime_path": "generated/pr02b/evidence/freeze/dynamics-experiment.json",
+      "contract_kind": "objgauss.dynamics_experiment",
+      "schema_version": "0.3.0"
+    }
+  },
+  "outputs": {
+    "root": "generated/pr02c/baselines/",
+    "prediction_contract_kind": "objgauss.dynamics_prediction",
+    "prediction_schema_version": "0.3.0",
+    "atomic_publish_required": true,
+    "git_ignored": true
+  },
+  "claim_boundary": {
+    "supported_claim": "deterministic-validation-baselines-are-reproducible-and-auditable",
+    "excluded_claims": [
+      "test-prediction-produced",
+      "trainer-implemented",
+      "learned-model-performance",
+      "scientific-baseline-comparison",
+      "gaussian-dynamics-value"
+    ]
+  }
+}

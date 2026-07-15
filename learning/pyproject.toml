@@ -14,6 +14,7 @@ dependencies = [
 [project.scripts]
 objgauss-pr02c-runtime = "objgauss_learning.runtime:main"
 objgauss-pr02c-data = "objgauss_learning.data:main"
+objgauss-pr02c-baselines = "objgauss_learning.baselines:main"
 
 [tool.uv]
 default-groups = []

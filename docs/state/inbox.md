@@ -36,9 +36,12 @@ C1 已提交只物化 48 train + 12 validation groups 的 source producer、chec
 60 groups / 300 branches、0 failed attempts；producer、loader 与 16 项独立 checks 的 data
 index 均为 `2501ebc2…17a81b5`，C1 为本地 `supported`。
 
-当前唯一开放动作是 C2 deterministic baselines：先实现并冻结 copy-state 与 constant-velocity，
-不得同时引入 learned model。当前仍没有 test source、baseline 实现、模型、trainer、checkpoint
-或模型性能证据。
+当前开放动作是完成 C2 clean acceptance。C2 已实现 validation-only sanitized bundle、copy-state、
+constant-velocity、独立 Node verifier、canonical/reverse repeat 和 clean gate；基于既有 ignored C1
+source 的 dirty diagnostic 生成 60 branches / 120 predictions，18 项 checks 全部通过，semantic
+index 为 `17488a15…7c647`。它尚未提交，不能替代 clean HEAD acceptance；下一步是提交后运行
+`./scripts/check-pr02c-baselines`。当前仍没有 test source/prediction、learned model、trainer、HPO、
+checkpoint 或模型性能证据。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB

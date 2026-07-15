@@ -318,7 +318,29 @@ package install 是唯一可联网阶段；执行 producer、loader 与所有验
 当前状态是 `c1_committed_local_supported`。代码承载 SHA `adb1a62` 的 clean gate 生成 60 groups /
 300 branches、0 failed attempts；producer、loader 与 16 项独立 checks 对同一 data index
 `2501ebc2…17a81b5` 均为 `supported`。C1 没有物化 12 个 test groups，也不支持 baseline、trainer、
-模型性能或科学结论；下一切片是 C2 deterministic baselines，尚未实现。
+模型性能或科学结论。
+
+### 验证 PR-02C C2 Deterministic Baselines
+
+```bash
+./scripts/check-pr02c-baselines
+```
+
+该 clean gate 先完整复跑 C1，再把 loader 输出投影成只含 validation 初态、commanded action
+schedule 与非未来 metadata 的 sanitized bundle。独立 baseline 进程不读取 source trajectory 或
+future GT，离线生成 copy-state 和 constant-velocity 两个确定性 arms 的 120 份 `0.3.0`
+prediction artifacts。Node verifier 不导入 Python producer，独立重算 source projection、public
+contract、payload/artifact checksum、两种 baseline 数学、lineage、final/future isolation、sibling
+初态不变性与 canonical/reverse repeat，并必须拒绝被篡改的 prediction；成功证据原子发布到 ignored
+`generated/pr02c/baselines/`。
+
+当前状态是 `c2_implemented_pending_clean_acceptance`。基于 C1 已有 ignored source 的 dirty
+diagnostic 已覆盖 12 validation groups / 60 branches / 120 predictions，18 项独立 checks 全部通过，
+canonical/reverse semantic index 均为 `17488a15…7c647`；篡改单份 prediction 后 verifier 以
+exit 4 拒绝，并同时标记 contract、payload checksum、constant-velocity 数学和 reverse repeat
+失败。这不是 clean HEAD acceptance，不能提升为本地正式 `supported`；C2 仍待提交后运行上述
+gate。当前没有 action-free/action-conditioned learned model、trainer、HPO、checkpoint、test
+prediction 或科学比较。
 
 ## 项目事实源
 

@@ -176,6 +176,7 @@ class DataBoundaryTests(unittest.TestCase):
                 "applied_steps": 10,
             }
             sample, _, payload = data.load_branch(
+                repo_root=root,
                 data_root=root,
                 directory=directory,
                 group_id="group-a",
@@ -191,6 +192,7 @@ class DataBoundaryTests(unittest.TestCase):
             (directory / "trajectory.json").write_text("{}\n")
             with self.assertRaisesRegex(data.DataInvalidError, "checksum mismatch"):
                 data.load_branch(
+                    repo_root=root,
                     data_root=root,
                     directory=directory,
                     group_id="group-a",
@@ -201,6 +203,72 @@ class DataBoundaryTests(unittest.TestCase):
                     source_commit="a" * 40,
                     source_plan_sha256="b" * 64,
                 )
+
+    def test_model_input_bundle_projects_only_validation_without_labels(self) -> None:
+        actor = data.ActorState(
+            actor_id="target",
+            position_W_m=(0.0, 0.0, 0.02),
+            quaternion_WO_wxyz=(1.0, 0.0, 0.0, 0.0),
+            linear_velocity_W_m_s=(0.1, 0.0, 0.0),
+            angular_velocity_W_rad_s=(0.0, 0.0, 0.0),
+        )
+        action = data.CommandedAction("hold", (0.0, 0.0, 0.0), 0.1, 100, 10)
+        inputs = data.ModelInputs((actor,), action, "target", data.SCORING_TIMES)
+
+        def group(group_id: str, split: str) -> data.GroupSample:
+            branches = tuple(
+                data.BranchSample(
+                    group_id=group_id,
+                    split=split,
+                    branch_id=branch_id,
+                    model_inputs=inputs,
+                    labels=data.TrainingLabels(tuple()),
+                    semantic_sha256="1" * 64,
+                    source_episode=data.SourceEpisodeReference(
+                        uri=f"generated/pr02c/data/{group_id}/{branch_id}/episode.json",
+                        sha256="2" * 64,
+                        lineage_sha256="3" * 64,
+                    ),
+                )
+                for branch_id in data.BRANCH_IDS
+            )
+            return data.GroupSample(group_id, split, branches)
+
+        groups = tuple(
+            [group("train-extra", "train")]
+            + [group(f"validation-{index:02d}", "validation") for index in range(12)]
+        )
+        loader_report = {
+            "inputs": {
+                "data_boundary_manifest_sha256": "4" * 64,
+                "formal_data_spec_sha256": "5" * 64,
+                "dynamics_experiment_sha256": "6" * 64,
+                "source_plan_sha256": "7" * 64,
+                "source_report_sha256": "8" * 64,
+            },
+            "data_index_sha256": "9" * 64,
+            "model_input_index_sha256": "a" * 64,
+        }
+        bundle = data.build_model_input_bundle(
+            repo_root=Path(__file__).resolve().parents[2],
+            groups=groups,
+            loader_report=loader_report,
+            source_commit="b" * 40,
+            node="node",
+        )
+        self.assertEqual(len(bundle["samples"]), 60)
+        self.assertEqual({item["split"] for item in bundle["samples"]}, {"validation"})
+        self.assertNotIn("train-extra", json.dumps(bundle["samples"]))
+        self.assertNotIn("labels", json.dumps(bundle["samples"]))
+        self.assertEqual(
+            bundle["inputs"]["loader_report_sha256"],
+            data.sha256_bytes(strict_json_bytes(loader_report)),
+        )
+
+        invalid = deepcopy(bundle)
+        invalid["samples"][0]["future_object_states"] = []
+        with self.assertRaisesRegex(data.DataInvalidError, "forbidden"):
+            data.assert_model_input_bundle(invalid, node="node")
 
 
 if __name__ == "__main__":
