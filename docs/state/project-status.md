@@ -93,5 +93,7 @@ validation-only golden checkpoint selection、`0.3.0` trial/attempt/checkpoint/p
 C6 的唯一机器执行 contract 已冻结在 `learning/hpo-manifest.json`：2 learned arms × 4 configs ×
 3 seeds 形成 24 个 tasks / 12 个 fairness pairs；clean runner commit 只生成一次共享
 `hpo_data_index`，独立 selector 按 ADR-006 为每个 arm 选择一个 config，并要求 canonical/reverse
-输入顺序重放一致。当前没有 runner、selector、PR-02C CPU workflow、HPO、正式冻结 checkpoint、
-test prediction、模型指标、Gaussian dynamics 或机器人控制证据。
+输入顺序重放一致。Paired runner、独立 selector/verifier、PR-02C CPU workflow、clean gate 与
+mutation tests 已实现，提交前完整 Node 门与 53 项 learning tests 已通过；implementation 尚未
+push/取得远端 CPU 证据，也未运行 24-task 验收。当前没有 HPO、正式冻结 checkpoint、test
+prediction、模型指标、Gaussian dynamics 或机器人控制证据。

@@ -193,7 +193,9 @@ pairs / 24 个固定 task IDs，并明确以下执行语义：
   performance promotion threshold，也不以近似平局、资源或运行顺序改变选择；
 - canonical/reverse 是同一组冻结结果的 selector 输入顺序重放，不是额外 HPO arm 或 task；
 - formal training 只用 train 拟合，validation 只选择 checkpoint；HPO checkpoint 不晋升为 formal
-  checkpoint。
+  checkpoint。C6 仍保存 task-local checkpoint artifact，并在 attempt、training log 和 task index
+  中记录字节与 tensor semantic hashes；但不发布 `objgauss.checkpoint_manifest`，因为冻结的
+  `0.3.0` schema 只允许 `final_evaluation_eligible=true`，该 manifest 由 C7 formal training 产生。
 
 C6 的唯一交付是确定性的双配置映射及完整 task/pair/checksum/data lineage。它不关闭 PR-02C，
 不产生模型性能 verdict；C7 仍须从头运行六个 formal tasks。

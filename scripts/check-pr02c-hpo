@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LEARNING_ROOT="$ROOT/learning"
+OUTPUT_ROOT="$ROOT/generated/pr02c"
+PUBLISH_ROOT="$OUTPUT_ROOT/hpo"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  printf 'invalid: PR-02C C6 acceptance requires a clean checkout\n' >&2
+  exit 4
+fi
+if [[ -n "${OBJGAUSS_NODE:-}" ]]; then
+  NODE_BIN="$OBJGAUSS_NODE"
+elif [[ "$(node --version 2>/dev/null || true)" == "v24.18.0" ]]; then
+  NODE_BIN="$(command -v node)"
+elif [[ -x "$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node" ]]; then
+  NODE_BIN="$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node"
+else
+  printf 'blocked: Node v24.18.0 is unavailable\n' >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+export OBJGAUSS_NODE="$NODE_BIN"
+export PYTHONDONTWRITEBYTECODE=1
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/hpo.XXXXXX")"
+LEARNING_VENV="$WORK_ROOT/learning-venv"
+RUN_ROOT="$WORK_ROOT/run"
+CANONICAL="$WORK_ROOT/selection-canonical"
+REVERSE="$WORK_ROOT/selection-reverse"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+# Locked installation is the only network-capable phase. Provision C6 before nested gates.
+export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev
+
+# Exactly one C1 materialization under the clean runner commit feeds all 24 tasks.
+./scripts/check-pr02c-data
+
+export UV_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+npm run check
+"$LEARNING_VENV/bin/python" -m unittest discover \
+  -s "$LEARNING_ROOT/tests" -p 'test_*.py' -v
+"$NODE_BIN" --test tests/pr02c-hpo.test.mjs
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+"$LEARNING_VENV/bin/objgauss-pr02c-hpo" \
+  --repo-root "$ROOT" \
+  --mode contract \
+  --device cpu \
+  --node "$NODE_BIN" \
+  --output "${WORK_ROOT#"$ROOT/"}/cpu-contract-report.json"
+
+"$LEARNING_VENV/bin/objgauss-pr02c-hpo" \
+  --repo-root "$ROOT" \
+  --mode run \
+  --device cuda \
+  --data-root generated/pr02c/data \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --output-root "${RUN_ROOT#"$ROOT/"}" \
+  --node "$NODE_BIN"
+
+"$LEARNING_VENV/bin/objgauss-pr02c-selector" \
+  --manifest learning/hpo-manifest.json \
+  --task-index "${RUN_ROOT#"$ROOT/"}/task-index.json" \
+  --artifact-root "${RUN_ROOT#"$ROOT/"}" \
+  --output-root "${CANONICAL#"$ROOT/"}" \
+  --order canonical
+"$LEARNING_VENV/bin/objgauss-pr02c-selector" \
+  --manifest learning/hpo-manifest.json \
+  --task-index "${RUN_ROOT#"$ROOT/"}/task-index.json" \
+  --artifact-root "${RUN_ROOT#"$ROOT/"}" \
+  --output-root "${REVERSE#"$ROOT/"}" \
+  --order reverse
+
+cmp "$CANONICAL/selected-configs.json" "$REVERSE/selected-configs.json"
+cmp "$CANONICAL/selection-report.json" "$REVERSE/selection-report.json"
+mv "$CANONICAL/selected-configs.json" "$RUN_ROOT/selected-configs.json"
+mv "$CANONICAL/selection-report.json" "$RUN_ROOT/selection-report.json"
+
+"$NODE_BIN" scripts/verify-pr02c-hpo.mjs \
+  --root "${RUN_ROOT#"$ROOT/"}" \
+  --repeat-root "${REVERSE#"$ROOT/"}" \
+  --manifest learning/hpo-manifest.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --checkpoint-auditor "$LEARNING_VENV/bin/objgauss-pr02c-checkpoint-audit" \
+  --output "${RUN_ROOT#"$ROOT/"}/verification-report.json"
+
+# Runner, selector, and sealed-config depth defenses must reject final test or drift.
+set +e
+"$LEARNING_VENV/bin/objgauss-pr02c-hpo" --mode contract --splits test >/dev/null
+RUNNER_TEST_EXIT=$?
+"$LEARNING_VENV/bin/objgauss-pr02c-selector" \
+  --task-index "${RUN_ROOT#"$ROOT/"}/task-index.json" \
+  --artifact-root "${RUN_ROOT#"$ROOT/"}" \
+  --output-root "${WORK_ROOT#"$ROOT/"}/selector-test" \
+  --splits test >/dev/null
+SELECTOR_TEST_EXIT=$?
+set -e
+if [[ "$RUNNER_TEST_EXIT" -ne 4 || "$SELECTOR_TEST_EXIT" -ne 4 ]]; then
+  printf 'invalid: C6 runner or selector accepted final test\n' >&2
+  exit 4
+fi
+
+MUTATED_MANIFEST="$WORK_ROOT/mutated-manifest.json"
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+const [source, target] = process.argv.slice(1);
+const value = JSON.parse(readFileSync(source, "utf8"));
+value.matrix.configurations[0].values.learning_rate = 0.2;
+writeFileSync(target, `${JSON.stringify(value)}\n`);
+' learning/hpo-manifest.json "$MUTATED_MANIFEST"
+set +e
+"$LEARNING_VENV/bin/objgauss-pr02c-hpo" \
+  --mode contract --manifest "${MUTATED_MANIFEST#"$ROOT/"}" --node "$NODE_BIN" >/dev/null
+CONFIG_MUTATION_EXIT=$?
+set -e
+if [[ "$CONFIG_MUTATION_EXIT" -ne 4 ]]; then
+  printf 'invalid: C6 runner accepted sealed config mutation\n' >&2
+  exit 4
+fi
+
+MUTATED_INDEX="$WORK_ROOT/mutated-task-index.json"
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+const [source, target] = process.argv.slice(1);
+const value = JSON.parse(readFileSync(source, "utf8"));
+const pair = value.tasks.filter((task) => task.pair_id === value.tasks[0].pair_id);
+pair[1].fairness.common_parameter_subtree_sha256 = "f".repeat(64);
+writeFileSync(target, `${JSON.stringify(value)}\n`);
+' "$RUN_ROOT/task-index.json" "$MUTATED_INDEX"
+set +e
+"$LEARNING_VENV/bin/objgauss-pr02c-selector" \
+  --task-index "${MUTATED_INDEX#"$ROOT/"}" \
+  --artifact-root "${RUN_ROOT#"$ROOT/"}" \
+  --output-root "${WORK_ROOT#"$ROOT/"}/selector-mutation" >/dev/null
+PAIR_MUTATION_EXIT=$?
+set -e
+if [[ "$PAIR_MUTATION_EXIT" -ne 2 ]]; then
+  printf 'invalid: C6 selector did not reject fairness mutation\n' >&2
+  exit 4
+fi
+
+rm -rf -- "$LEARNING_VENV" "$REVERSE" "$CANONICAL"
+rm -rf -- "$PUBLISH_ROOT"
+mv "$RUN_ROOT" "$PUBLISH_ROOT"
+trap - EXIT
+rm -rf -- "$WORK_ROOT"
+
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync } from "node:fs";
+const verification = JSON.parse(readFileSync("generated/pr02c/hpo/verification-report.json", "utf8"));
+const selected = JSON.parse(readFileSync("generated/pr02c/hpo/selected-configs.json", "utf8"));
+console.log(JSON.stringify({
+  verdict: verification.verdict,
+  runner_commit: verification.runner_commit,
+  tasks: verification.counts.tasks,
+  fairness_pairs: verification.counts.fairness_pairs,
+  checks: verification.counts.checks,
+  mapping: Object.fromEntries(Object.entries(selected.mapping).map(([arm, value]) => [arm, value.config_id])),
+  selection_semantic_sha256: selected.selection_semantic_sha256,
+}));
+'

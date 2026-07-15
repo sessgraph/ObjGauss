@@ -17,6 +17,8 @@ objgauss-pr02c-data = "objgauss_learning.data:main"
 objgauss-pr02c-baselines = "objgauss_learning.baselines:main"
 objgauss-pr02c-trainer = "objgauss_learning.trainer:main"
 objgauss-pr02c-checkpoint-audit = "objgauss_learning.checkpoint:main"
+objgauss-pr02c-hpo = "objgauss_learning.hpo:main"
+objgauss-pr02c-selector = "objgauss_learning.selector:main"
 
 [tool.uv]
 default-groups = []

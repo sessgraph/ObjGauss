@@ -48,10 +48,11 @@ C1 的 60 groups / 300 branches / 0 failures 与 C2 的 120 predictions；C3 CPU
 canonical/reverse golden、24/24 checks、test-split rejection、参数账本 mutation 和 checksums 均
 supported，semantic index 为 `709f6f76…d3db`。当前开放动作是 C6 的 24-task HPO/config freeze；
 `4498bd6` 与 `1c0d6ed` 已推送，但尚无 PR-02C CPU workflow。C6 的 24 task IDs、12 pair IDs、
-config IDs、selector、retry、资源和输出 contract 已冻结为 `learning/hpo-manifest.json`。当前开放
-动作是实现 runner、独立 selector、CPU workflow 与 mutation tests；在 clean runner commit
-只生成一次共享 `hpo_data_index` 后才运行 24 tasks。当前仍没有 test source/prediction、正式
-冻结 checkpoint、模型性能或科学比较证据。
+config IDs、selector、retry、资源和输出 contract 已冻结为 `learning/hpo-manifest.json`。Paired
+runner、独立 selector/verifier、CPU workflow、clean gate 与 mutation tests 已实现，提交前完整
+CPU 门已通过；当前开放动作是 push implementation 并取得远端 CPU 证据，然后在同一 clean
+runner commit 只生成一次共享 `hpo_data_index` 并运行 24 tasks。当前仍没有 test
+source/prediction、正式冻结 checkpoint、模型性能或科学比较证据。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB

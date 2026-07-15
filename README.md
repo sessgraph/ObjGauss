@@ -364,11 +364,26 @@ report SHA-256 为 `096d244e…9869`，verification report 为 `e26512fc…bb40`
 文件，其中 24 项 artifact checksum index 已复核。没有运行 HPO、formal training 或 final test，
 也没有冻结正式 checkpoint 或模型性能/科学比较结论。
 
-C3 代码与状态提交 `4498bd6`、`1c0d6ed` 已推送；因仓库尚无 PR-02C CPU workflow，准确状态为
+C3 代码与状态提交 `4498bd6`、`1c0d6ed` 已推送；因该远端 SHA 尚无 PR-02C CPU workflow，准确状态为
 `c3_pushed_gpu_local_supported`，旧 PR-00/PR-01 workflow 不计作 C3 CPU 证据。C6 的唯一机器
 执行 contract 已冻结在 [`learning/hpo-manifest.json`](learning/hpo-manifest.json)：24 个 tasks
 组成 12 个 fairness pairs，在 clean runner commit 下共同消费一次生成的 `hpo_data_index`，独立
-selector 为两个 learned arms 各冻结一个 config。当前尚未实现或运行 C6。
+selector 为两个 learned arms 各冻结一个 config。C6 runner/selector 已实现，提交前完整 CPU 门
+已通过，但尚未 push/取得远端 CPU 证据，也尚未从 clean runner commit 运行 24-task 验收。
+
+### 验证 PR-02C C6 HPO/Config Freeze
+
+```bash
+./scripts/check-pr02c-hpo
+```
+
+C6 clean gate 会在当前 clean commit 下只生成一次 48 train + 12 validation 的共享
+`hpo-data-index.json`，随后以 12 个 fairness pairs 锁步运行 24 个冻结 tasks。独立 selector 只读
+task artifacts，按 validation group-first、三个 seeds 等权与精确分数平局时的 config ID 字典序，
+为 `action_free` 和 `action_conditioned` 各冻结一个 config；canonical/reverse 只重放 selector
+输入顺序。远端 `.github/workflows/pr02c-cpu.yml` 只运行 contract、CPU tiny 和 mutations，不运行
+GPU HPO。当前 implementation commit 只承载代码与 CPU 证据，尚未从该 clean commit 完成
+24-task 验收，因此仍没有 selected config、formal checkpoint、test prediction 或模型性能结论。
 
 ## 项目事实源
 

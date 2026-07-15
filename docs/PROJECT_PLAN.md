@@ -752,8 +752,10 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
 7. C6 机器 contract 已在 [`learning/hpo-manifest.json`](../learning/hpo-manifest.json) 冻结：
    `2 learned arms × 4 configs × 3 seeds = 24 tasks`，组成 12 个 fairness pairs；C3 data index
    只作 reference，clean runner commit 必须只生成一次共享 `hpo_data_index`。独立 selector 按
-   ADR-006 为两个 arms 各冻结一个 config，并做 canonical/reverse 输入顺序重放；当前尚未实现
-   runner、selector 或 PR-02C CPU workflow，也未运行 HPO。
+   ADR-006 为两个 arms 各冻结一个 config，并做 canonical/reverse 输入顺序重放。Paired runner、
+   独立 selector/verifier、CPU workflow、mutation tests 与 clean gate 已实现，提交前完整 CPU 门
+   已通过；implementation commit push 并通过远端 CPU 后，才从同一 clean commit 运行本地
+   24-task HPO。当前尚未运行 HPO。
 8. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
    validation-selected checkpoint、train/validation predictions、machine report 和 checksums。
 
@@ -1261,5 +1263,7 @@ Owner 选择。
    通过完整 clean acceptance：C1 data index `dd5994a3…1a30`，CPU tiny 与 GPU canonical/reverse
    golden 的 24 checks supported，semantic index 为 `709f6f76…d3db`，test split 和公平性账本
    mutation 均被拒绝；`4498bd6` 与状态提交 `1c0d6ed` 已推送。C6 的 task/pair/selector contract
-   已冻结为 `learning/hpo-manifest.json`；下一步实现 runner、独立 selector、CPU workflow 与负例，
-   然后才运行 24-task HPO。当前没有 HPO、正式冻结 checkpoint、test prediction 或模型性能证据。
+   已冻结为 `learning/hpo-manifest.json`；runner、独立 selector/verifier、CPU workflow 与负例已
+   实现，提交前完整 CPU 门已通过。下一步 push implementation 并取得远端 CPU 证据，然后才从
+   同一 clean commit 运行 24-task HPO。当前没有 HPO、正式冻结 checkpoint、test prediction 或
+   模型性能证据。
