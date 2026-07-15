@@ -143,7 +143,7 @@ def package_tree_sha256(repo_root: Path) -> str:
     package_root = learning_root / "src" / "objgauss_learning"
     sources = [
         learning_root / "pyproject.toml",
-        learning_root / "runtime-manifest.json",
+        *sorted(learning_root.glob("*.json")),
         *sorted(package_root.glob("*.py")),
     ]
     if any(not path.is_file() for path in sources):

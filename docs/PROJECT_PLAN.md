@@ -4,8 +4,8 @@
 > 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭；PR-02A 已本地实现、通过项目门并
 > 提交，但尚未取得远端 CI 证据；PR-02B 已提交，并在代码承载 SHA `04ddb18` 上完成 clean
 > acceptance，pilot/data freeze 为本地 `supported`；PR-02C 已获动作授权，提交 `fc20023` 的
-> C0 runtime gate 已通过 clean GPU 验收
-> 版本：0.21
+> C0 runtime gate 已通过 clean GPU 验收，C1 data boundary 已实现并等待 clean HEAD 验收
+> 版本：0.22
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -91,9 +91,10 @@
 >   该事实本身只关闭 PR-02B，也不支持模型性能或 Gaussian dynamics 声明。
 > - `confirmed_fact`：Owner 已于 2026-07-15 单独授权 PR-02C Trainer/Baselines 并要求先规划。
 >   ADR-006 的三个规划问题已经冻结并提升为 accepted；C0 已建立 `learning/`、精确 lock、
->   runtime/isolation/GPU probe 与独立 verifier，仍未建立 formal cohort、loader、模型、trainer、
->   checkpoint 或模型结果。代码提交 `fc20023` 的 clean gate 已在精确 Node/Python/Torch/CUDA
->   runtime 上得到 `supported`，当前尚无远端 CI。
+>   runtime/isolation/GPU probe 与独立 verifier；代码提交 `fc20023` 的 clean gate 已在精确
+>   Node/Python/Torch/CUDA runtime 上得到 `supported`。C1 train/validation source producer、
+>   checksum/lineage loader 与独立 verifier 已实现，dirty-tree 60-group 诊断通过，clean HEAD
+>   acceptance 尚待提交后运行；仍未建立模型、trainer、checkpoint 或模型结果。
 > - `decision`：PR-02C 只物化 48 train + 12 validation groups；12 个 final test groups 在
 >   PR-02E 配置/checkpoint 冻结前只保留 PR-02B spec，不生成 episode、trajectory 或 GT future。
 >   PR-02C 出现任何 test 数据产物均为 `invalid`，不能只依赖 loader 权限补救。
@@ -701,7 +702,7 @@ SHA-256 为 `47ad53c6…944cc`。其唯一权威入口仍是 `./scripts/check-pr
 
 ### PR-02C 授权后实施计划
 
-PR-02C 当前状态为 `c0_committed_local_supported`，其唯一假设是独立 clean GPU runtime 能在
+PR-02C 当前状态为 `c1_implemented_pending_clean_acceptance`，其唯一假设是独立 clean GPU runtime 能在
 不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，可复现地产生
 四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。C0 只支持该假设的
 runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比较仍由 PR-02D/PR-02E 完成。
@@ -717,7 +718,9 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
    可以开始，但不得把 C0 外推成 loader、trainer 或模型性能证据。
 3. 只生成并审计 48 train + 12 validation groups；12 个 test groups 仅消费冻结 spec，不得生成
    数据。建立 checksum/lineage loader，并以行为测试证明 test、GT future、executed-action
-   feature、缺失 commanded action 和跨 split identity fail closed。
+   feature、缺失 commanded action 和跨 split identity fail closed。C1 实现已完成：dirty-tree
+   精确 runtime 诊断生成 60 groups / 300 branches、0 failed attempts，producer/loader/16 项独立
+   checks 对同一 data index `ce6e6bd9…20c209` 一致；该结果尚待提交后的 clean gate 提升为证据。
 4. 实现 copy-state、constant-velocity、action-free、action-conditioned 四个 arms；两个 learned
    arms 共享 backbone、四区间 variable-`Δt` transition、参数量、updates、数据顺序、grid 和
    seeds。
@@ -1222,6 +1225,6 @@ Owner 选择。
    21 项 freeze verification 与 checksums 均通过。PR-02B 已关闭。
 8. Owner 已单独授权 PR-02C；ADR-006 的 final test 延迟物化、四评分区间 variable-`Δt`
    rollout 与 HPO 两级等权聚合均已冻结。C0 runtime/contract gate 已由 `fc20023` 实现并在
-   clean GPU 门得到 `supported`，状态为 `c0_committed_local_supported`；下一步是 C1 只物化并
-   审计 train/validation cohort 与 fail-closed loader。当前没有 trainer、checkpoint 或模型性能
-   证据。
+   clean GPU 门得到 `supported`；C1 train/validation source 与 fail-closed loader 已实现，状态为
+   `c1_implemented_pending_clean_acceptance`。下一步是提交后运行 `./scripts/check-pr02c-data`；
+   supported 前不进入 C2 deterministic baselines。当前没有 trainer、checkpoint 或模型性能证据。

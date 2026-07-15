@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_ROOT="$ROOT/sim"
+LEARNING_ROOT="$ROOT/learning"
+OUTPUT_ROOT="$ROOT/generated/pr02c"
+PUBLISH_ROOT="$OUTPUT_ROOT/data"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  printf 'invalid: PR-02C C1 acceptance requires a clean checkout\n' >&2
+  exit 4
+fi
+if [[ -n "${OBJGAUSS_NODE:-}" ]]; then
+  NODE_BIN="$OBJGAUSS_NODE"
+elif [[ "$(node --version 2>/dev/null || true)" == "v24.18.0" ]]; then
+  NODE_BIN="$(command -v node)"
+elif [[ -x "$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node" ]]; then
+  NODE_BIN="$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node"
+else
+  printf 'blocked: Node v24.18.0 is unavailable\n' >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+export OBJGAUSS_NODE="$NODE_BIN"
+export UV_OFFLINE=1
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export PYTHONDONTWRITEBYTECODE=1
+
+./scripts/check-pr02b-pilot
+./scripts/check-pr02c-runtime
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/data.XXXXXX")"
+SIM_VENV="$WORK_ROOT/sim-venv"
+LEARNING_VENV="$WORK_ROOT/learning-venv"
+ASSET_DIR="$WORK_ROOT/no-assets"
+PUBLISH="$WORK_ROOT/publish"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+mkdir "$ASSET_DIR" "$WORK_ROOT/xdg-cache" "$WORK_ROOT/mpl-cache" "$PUBLISH"
+chmod 0555 "$ASSET_DIR"
+export MS_ASSET_DIR="$ASSET_DIR"
+export XDG_CACHE_HOME="$WORK_ROOT/xdg-cache"
+export MPLCONFIGDIR="$WORK_ROOT/mpl-cache"
+export OBJGAUSS_REPO_ROOT="$ROOT"
+unset MS_SKIP_ASSET_DOWNLOAD_PROMPT || true
+
+export UV_PROJECT_ENVIRONMENT="$SIM_VENV"
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev --no-install-project --no-build
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev
+export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev
+
+OBJGAUSS_REPO_ROOT="$ROOT" PYTHONPATH="$SIM_ROOT/src" \
+  "$SIM_VENV/bin/python" -m unittest sim.tests.test_pr02_data -v
+"$LEARNING_VENV/bin/python" -m unittest discover \
+  -s "$LEARNING_ROOT/tests" -p 'test_*.py' -v
+node --test tests/pr02c-data.test.mjs
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+set +e
+"$SIM_VENV/bin/objgauss-pr02-data" \
+  --repo-root "$ROOT" \
+  --output-root "$WORK_ROOT/forbidden-test" \
+  --splits test \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --pilot-report generated/pr02b/evidence/freeze/pilot-report.json \
+  --node "$NODE_BIN" \
+  --source-commit "$SOURCE_COMMIT"
+TEST_EXIT=$?
+set -e
+if [[ "$TEST_EXIT" -ne 4 || -e "$WORK_ROOT/forbidden-test/dataset" ]]; then
+  printf 'invalid: source CLI did not fail closed for split=test\n' >&2
+  exit 4
+fi
+
+"$SIM_VENV/bin/objgauss-pr02-data" \
+  --repo-root "$ROOT" \
+  --output-root "$PUBLISH" \
+  --splits train validation \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --pilot-report generated/pr02b/evidence/freeze/pilot-report.json \
+  --node "$NODE_BIN" \
+  --source-commit "$SOURCE_COMMIT"
+
+"$LEARNING_VENV/bin/objgauss-pr02c-data" \
+  --repo-root "$ROOT" \
+  --data-root "${PUBLISH#"$ROOT/"}" \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --splits train validation \
+  --output "${PUBLISH#"$ROOT/"}/loader-report.json"
+
+"$NODE_BIN" scripts/verify-pr02c-data.mjs \
+  --root "${PUBLISH#"$ROOT/"}" \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --manifest learning/data-boundary-manifest.json \
+  --loader-report "${PUBLISH#"$ROOT/"}/loader-report.json" \
+  --source-commit "$SOURCE_COMMIT" \
+  --output "${PUBLISH#"$ROOT/"}/verification-report.json"
+
+(
+  cd "$PUBLISH"
+  find . -type f -print0 | sort -z | xargs -0 sha256sum > "$WORK_ROOT/checksums.sha256"
+)
+mv "$WORK_ROOT/checksums.sha256" "$PUBLISH/checksums.sha256"
+(
+  cd "$PUBLISH"
+  sha256sum --quiet -c checksums.sha256
+)
+
+rm -rf -- "$SIM_VENV" "$LEARNING_VENV" "$ASSET_DIR" "$WORK_ROOT/xdg-cache" "$WORK_ROOT/mpl-cache"
+rm -rf -- "$PUBLISH_ROOT"
+mv "$PUBLISH" "$PUBLISH_ROOT"
+trap - EXIT
+rm -rf -- "$WORK_ROOT"
+
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync } from "node:fs";
+const source = JSON.parse(readFileSync("generated/pr02c/data/source-report.json", "utf8"));
+const loader = JSON.parse(readFileSync("generated/pr02c/data/loader-report.json", "utf8"));
+const verification = JSON.parse(readFileSync("generated/pr02c/data/verification-report.json", "utf8"));
+console.log(JSON.stringify({
+  verdict: verification.verdict,
+  source_commit: verification.source_commit,
+  groups: verification.counts.groups,
+  branches: verification.counts.branches,
+  checks: verification.counts.checks,
+  data_index_sha256: verification.data_index_sha256,
+  source_status: source.verdict.status,
+  loader_status: loader.verdict.status,
+  evidence_root: "generated/pr02c/data",
+}));
+'

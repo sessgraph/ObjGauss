@@ -48,7 +48,10 @@ function stableBytes(value) {
 function packageTreeSha256() {
   const paths = [
     resolve(ROOT, "learning/pyproject.toml"),
-    resolve(ROOT, "learning/runtime-manifest.json"),
+    ...readdirSync(resolve(ROOT, "learning"))
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .map((name) => resolve(ROOT, "learning", name)),
     ...readdirSync(resolve(ROOT, "learning/src/objgauss_learning"))
       .filter((name) => name.endsWith(".py"))
       .sort()

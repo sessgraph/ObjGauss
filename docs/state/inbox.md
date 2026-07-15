@@ -31,10 +31,14 @@ Owner 已冻结 HPO config 聚合：每个 config 先对 12 validation groups gr
 测试。`./scripts/check-pr02c-runtime` 在 Node `24.18.0` 下通过 77 项全库测试、12 个 Python
 测试、14 项独立 checks 和真实 RTX 5060 Ti probe，C0 为本地 `supported`。
 
-当前下一动作是 C1：只物化并审计 48 train + 12 validation groups，建立 checksum/lineage
-loader，并证明 test、GT future、executed-action feature、缺失 commanded action 与跨 split
-identity 全部 fail closed。当前仍没有 formal cohort、loader、模型、trainer、checkpoint 或模型
-性能证据；C1 不得提前进入模型实现。
+C1 已实现只物化 48 train + 12 validation groups 的 source producer、checksum/lineage loader、
+独立 Node verifier、两层 test-split 拒绝和行为负例。dirty-tree 精确 runtime 诊断产生 60 groups /
+300 branches、0 failed attempts；producer、loader 与 16 项独立 checks 的 data index 均为
+`ce6e6bd9…20c209`。这不是 clean acceptance。
+
+当前唯一开放动作是提交 C1 代码与文档，然后在该 clean HEAD 运行
+`./scripts/check-pr02c-data`。C1 为 `supported` 前不进入 C2 deterministic baselines；当前仍没有
+test source、baseline、模型、trainer、checkpoint 或模型性能证据。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB

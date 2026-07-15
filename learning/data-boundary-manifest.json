@@ -1,0 +1,67 @@
+{
+  "manifest_version": "0.1.0",
+  "manifest_kind": "objgauss.pr02c-data-boundary",
+  "frozen_inputs": {
+    "pilot_spec": {
+      "path": "contracts/fixtures/pr02b/pilot-spec.json",
+      "sha256": "5a4be3ac36925ce8af47920802c8c5c67a01efa89511c623d3427d123a9548de"
+    },
+    "source_experiment": {
+      "path": "contracts/fixtures/pr02b/source-experiment.json",
+      "sha256": "4351b630c858db1d80a60dc6d8d3b498c039e996e4991b2ae38b97440042f0a2"
+    },
+    "simulator_lock": {
+      "path": "sim/uv.lock",
+      "sha256": "69d3b8c1ede6e2839b1b0bfd8cdcee5eb657aa0e60f525cfa4726e359f47a52e"
+    },
+    "formal_data_spec": {
+      "runtime_path": "generated/pr02b/evidence/freeze/formal-data-spec.json",
+      "sha256": "770d116b8f25cf1300497981d02a9d1243db7331cd302633db43e5c10f06ea63"
+    }
+  },
+  "materialization": {
+    "allowed_splits": ["train", "validation"],
+    "forbidden_split": "test",
+    "group_counts": {"train": 48, "validation": 12},
+    "branches_per_group": 5,
+    "branch_ids": [
+      "hold",
+      "push-neg-x-weak",
+      "push-pos-x-strong",
+      "push-pos-x-weak",
+      "push-pos-y-weak"
+    ],
+    "scoring_times_s": [0.1, 0.2, 0.5, 1.1],
+    "source_episode_schema_version": "0.2.0"
+  },
+  "loader_boundary": {
+    "model_input_fields": [
+      "initial_object_states",
+      "commanded_action",
+      "target_object_id",
+      "rollout_times_s"
+    ],
+    "label_fields": ["future_object_states"],
+    "forbidden_model_input_fields": [
+      "executed_action",
+      "control_ledger",
+      "future_object_states",
+      "gt_future"
+    ]
+  },
+  "outputs": {
+    "root": "generated/pr02c/data/",
+    "git_ignored": true,
+    "atomic_publish_required": true
+  },
+  "claim_boundary": {
+    "supported_claim": "train-validation-source-and-loader-boundary-is-valid",
+    "excluded_claims": [
+      "test-source-materialized",
+      "trainer-implemented",
+      "model-performance",
+      "scientific-baseline-comparison",
+      "gaussian-dynamics-value"
+    ]
+  }
+}

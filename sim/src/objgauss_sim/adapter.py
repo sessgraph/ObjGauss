@@ -46,6 +46,7 @@ def producer_tree_sha256(validator: Path) -> str:
             "adapter.py",
             "canonical.py",
             "cohort.py",
+            "pr02_data.py",
             "primitive.py",
             "runtime.py",
             "writer.py",

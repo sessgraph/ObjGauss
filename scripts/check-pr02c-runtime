@@ -70,6 +70,7 @@ node scripts/verify-pr02c-runtime.mjs \
   sha256sum --quiet -c checksums.sha256
 )
 
+rm -rf -- "$VENV"
 rm -rf -- "$PUBLISH_ROOT"
 mv "$WORK_ROOT" "$PUBLISH_ROOT"
 trap - EXIT

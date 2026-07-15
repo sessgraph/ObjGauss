@@ -17,7 +17,7 @@
 | PR-01F Delivery | `committed_remote_supported` | 验收 SHA `234ba00`；clean `accept-pr01` supported；1210 checksum entries；远端 delivery 成功 | 保持回归门，不向 PR-02 外推声明 |
 | PR-02A Contract | `committed_local_supported` | 7 schemas；6 records/positive fixtures；39 negatives；旧 5 contract hashes 冻结；report `3b1e64a0…acccca3f`；`npm run check` 通过 | 远端未运行，不扩大为数据/模型证据 |
 | PR-02B Pilot/Data Freeze | `committed_local_supported` | `b99b5f1` + `04ddb18`；代码承载 SHA `04ddb18` clean acceptance：两遍各 12 groups / 60 episodes、0 failed/extra，source audits、GPU 1 GiB reserve、21 checks 与 checksums supported；report `47ad53c6…944cc`；保留 source rejection 与 power 量纲错误负证据 | 无远端 CI；后续代码 HEAD 必须重跑唯一验收门 |
-| PR-02C Trainer/Baselines | `c0_committed_local_supported` | 提交 `fc20023`；accepted ADR-006；clean C0 gate 在 Node 24.18.0 下通过 77 项全库测试、12 Python tests、14 verification checks 与真实 RTX 5060 Ti probe；精确 lock、offline/simulator isolation、HEAD/lock/grid lineage、12 GiB cap/1 GiB reserve supported | 进入 C1：仅生成 train/validation cohort 与 fail-closed loader；不得实现模型或读取 final GT |
+| PR-02C Trainer/Baselines | `c1_implemented_pending_clean_acceptance` | C0 `fc20023` clean supported；C1 已实现 train/validation-only producer、无 simulator loader 与独立 verifier；dirty 精确 runtime 诊断为 60 groups / 300 branches / 0 failures、16 checks，三方 data index `ce6e6bd9…20c209` 一致 | 提交后运行 `./scripts/check-pr02c-data`；supported 前不进入 C2 baselines |
 | PR-02D Independent Audit | `planned_blocked_by_pr02c` | evaluator 独立性与 hard gates 已预注册；尚无实现 | PR-02C 通过后实现 mutation/audit 门 |
 | PR-02E Formal Experiment | `planned_blocked_by_pr02d` | final 隔离、统计与 verdict 语义已预注册；尚未运行 | PR-02D `supported` 后一次性运行 frozen experiment |
 | PR-02F Delivery/CI | `planned_blocked_by_pr02e` | Web/CI 声明边界已确认；尚无 Delivery | PR-02E 产生有效 verdict 后构建验收投影 |

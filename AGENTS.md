@@ -10,8 +10,8 @@
 - 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 与 PR-02B
   pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C Trainer/Baselines 已获动作
   授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已由提交 `fc20023` 实现并通过
-  clean GPU 验收；loader、formal cohort、模型与 trainer 尚未实现。准确动态状态以
-  `docs/state/` 为准。
+  clean GPU 验收；C1 train/validation source 与 fail-closed loader 已实现、等待 clean HEAD
+  验收，模型与 trainer 尚未实现。准确动态状态以 `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
@@ -171,11 +171,11 @@
 | contracts/fixtures/ | 固定 fixture spec、正负例、producer identity 与预期 checksum manifest |
 | src/pr00/ | frame math、validator、producer、evaluator、verdict 与 browser consumer 源码 |
 | src/pr01/ | PR-01 contract dispatch 与独立 auditor；auditor 不得导入 simulator 或 writer |
-| sim/ | PR-01 隔离 Python package、精确 uv lock、程序化 primitive runtime、adapter、原子 writer，以及 PR-02B calibration/power freeze producer；只供离线证据生成，不含 trainer |
-| learning/ | PR-02C 独立纯 PyTorch package、精确 uv lock 与 C0 runtime/isolation/GPU probe；当前不含 loader、模型或 trainer，禁止导入 simulator |
+| sim/ | PR-01 隔离 Python package、精确 uv lock、程序化 primitive runtime、adapter、原子 writer、PR-02B calibration/power freeze producer 与 PR-02C train/validation source producer；只供离线证据生成，不含 loader/trainer |
+| learning/ | PR-02C 独立纯 PyTorch package、精确 uv lock、C0 runtime/isolation/GPU probe 与 C1 checksum/lineage loader；当前不含模型或 trainer，禁止导入 simulator |
 | viewer/ | Stage-0 WebGL2 Gaussian 世界、PR-00 同步 contract 证据页与 PR-01 无 RGB 五联回放源码 |
-| scripts/ | PR-00/PR-01/PR-02A contract audit、build/syntax、Stage-0 预览获取、RES-001/PR-01 source pilots、PR-01 clean-install gates、PR-02B clean pilot/freeze verifier 与 PR-02C C0 clean runtime gate |
-| tests/、sim/tests/、learning/tests/ | Stage-0、PR-00、PR-01、PR-02A contract、PR-02B pilot/freeze 与 PR-02C C0 runtime/isolation 的行为和负例测试 |
+| scripts/ | PR-00/PR-01/PR-02A contract audit、build/syntax、Stage-0 预览获取、RES-001/PR-01 source pilots、PR-01 clean-install gates、PR-02B clean pilot/freeze verifier 与 PR-02C C0/C1 clean gates |
+| tests/、sim/tests/、learning/tests/ | Stage-0、PR-00、PR-01、PR-02A contract、PR-02B pilot/freeze 与 PR-02C runtime/data-boundary 的行为和负例测试 |
 | generated/pr00/ | Git ignored 的确定性 episode、数组、报告与 browser bundle；不得手改或提交 |
 | generated/pr01b/ | Git ignored 的 canonical/reverse runtime smoke 报告；可重建、不得提交 |
 | generated/pr01c/ | Git ignored 的 golden group 与 writer 报告；可重建、不得提交 |
@@ -183,16 +183,17 @@
 | generated/pr01e/ | Git ignored 的 preflight/formal cohort 与 audit 输出；可重建、不得提交 |
 | generated/pr02a/ | Git ignored 的 PR-02A contract machine report；由正式 audit 重建，不得提交 |
 | generated/pr02b/ | Git ignored 的 PR-02B repeat/audit/freeze evidence；只有 clean gate 生成的 `evidence/` 可用于验收，仍不得提交 |
-| generated/pr02c/ | Git ignored 的 PR-02C runtime、训练与后续证据根；C0 当前只允许 clean gate 原子发布 `runtime/`，不得提交 |
+| generated/pr02c/ | Git ignored 的 PR-02C runtime、source/loader、训练与后续证据根；C0/C1 clean gates 分别原子发布 `runtime/` 与 `data/`，不得提交 |
 | artifacts/pr01/ | Git ignored 的最终 Delivery 投影；只由 clean-checkout 验收生成，不得提交 |
 | package.json、package-lock.json、.node-version | PR-00 命令、精确依赖解析与 Node runtime 事实源 |
 | .github/workflows/ | PR-00 Node 门与 PR-01 runtime/writer/audit/cohort/delivery 门；不部署或发布 |
 | data/ | Git ignored 本地数据；不得提交 |
 | .git 中的归档标签 | 旧项目只读恢复点，不是当前源码目录 |
 
-`learning/` 当前只实现 PR-02C C0 的精确 runtime、隔离与资源门，不是模型能力；仍没有 loader、
-formal cohort、模型、trainer 或 checkpoint。后续只按 ADR-006 的串行门增加真实调用方，不预建
-空结构或假想扩展点。
+`learning/` 当前实现 PR-02C C0 的精确 runtime/隔离/资源门与 C1 的 checksum/lineage loader；
+loader 只暴露初态、commanded action 与 rollout times，future GT 单独作为 train/validation labels，
+不暴露 executed action。仍没有模型、trainer 或 checkpoint；后续只按 ADR-006 的串行门增加
+真实调用方，不预建空结构或假想扩展点。
 
 ## 4. 当前权威命令
 
@@ -232,12 +233,14 @@ formal cohort、模型、trainer 或 checkpoint。后续只按 ADR-006 的串行
 | PR-02B clean pilot/data freeze | `./scripts/check-pr02b-pilot`；要求 clean checkout、Node 24.18.0、uv 0.11.17、冻结 runtime、离线/空资产，生成 canonical/reverse source、独立 audits、GPU 1 GiB 显示保留 probe、`0.3.0` experiment 与 checksum/lineage verification |
 | PR-02C C0 unit tests | `npm run test:pr02c` 与 `uv run --project learning --frozen --no-dev python -m unittest discover -s learning/tests -p 'test_runtime.py'`；分别覆盖 manifest/lock 静态门与 Python runtime 失败语义 |
 | PR-02C C0 clean runtime gate | `./scripts/check-pr02c-runtime`；要求 clean checkout、Node 24.18.0、uv 0.11.17、CPython 3.10.20、精确 `learning/uv.lock`、离线且无 simulator 的新 venv，并验证 CUDA 13.0、12 GiB cap、至少 1 GiB 显示显存保留、HEAD/lock/grid lineage 与独立 verifier |
+| PR-02C C1 unit tests | `npm run test:pr02c-data`、`OBJGAUSS_REPO_ROOT="$PWD" PYTHONPATH=sim/src python3 -m unittest sim.tests.test_pr02_data` 与 `uv run --project learning --frozen --no-dev python -m unittest discover -s learning/tests -p 'test_data.py'`；不物化正式 source |
+| PR-02C C1 clean data gate | `./scripts/check-pr02c-data`；要求 clean checkout，先重建 PR-02B freeze 与 C0 runtime，再仅物化/审计 48 train + 12 validation groups，运行无 simulator loader 和独立 300-branch verifier；发现 test artifact、坏 checksum/lineage、executed/future model feature 或跨 split identity 即 `invalid` |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。
 Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md，PR-00 决策见
-docs/adr/0002-pr00-contract-stack.md；PR-02C C0 的真实命令已与 `learning/uv.lock` 和脚本同步，
-loader/trainer 与 PR-02D–F 命令仍尚未定义。PR-03 之后的模型/表示栈仍须另行决定。
+docs/adr/0002-pr00-contract-stack.md；PR-02C C0/C1 的真实命令已与 `learning/uv.lock` 和脚本同步，
+baselines/trainer 与 PR-02D–F 命令仍尚未定义。PR-03 之后的模型/表示栈仍须另行决定。
 
 ## 5. 会话启动协议
 
