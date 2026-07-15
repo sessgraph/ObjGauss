@@ -339,8 +339,28 @@ contract、payload/artifact checksum、两种 baseline 数学、lineage、final/
 12 validation groups / 60 branches 上发布 120 份 deterministic predictions，18 项独立 checks
 全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`。篡改单份 prediction 后
 verifier 以 exit 4 拒绝，并同时标记 contract、payload checksum、constant-velocity 数学和
-reverse repeat 失败。当前没有远端 CI，也没有 action-free/action-conditioned learned model、
-trainer、HPO、checkpoint、test prediction 或科学比较；下一切片是 C3 learned arms/trainer。
+reverse repeat 失败。当前没有远端 CI；C2 本身不支持 learned model、HPO、checkpoint、test
+prediction 或科学比较。
+
+### 验证 PR-02C C3 Minimal Object GNN/Trainer
+
+```bash
+./scripts/check-pr02c-trainer
+```
+
+C3 在纯 PyTorch `learning/` 中实现共享两层 object encoder、两层 pairwise message MLP、一次
+mean aggregation 与两层 residual head。Action-conditioned 只向 target object 注入裁剪到当前
+区间的力、目标对象坐标系 COM 作用点、active duration/fraction；action-free 保留同形状 action
+encoder 与 learned mask token。两 arm 复用同一四区间 variable-`Δt` transition，只在初态
+teacher-force，并保持参数量、updates、数据顺序、grid 和 seed 公平。
+
+当前状态是 `c3_implemented_pending_clean_acceptance`。工作区的 CPU tiny CLI 已通过；宿主 GPU
+canonical/reverse diagnostic repeat 由独立 verifier 完成 24/24 checks，semantic index 为
+`709f6f76…d3db`，每 arm 35,734 个参数，峰值显存 68,277,760 bytes，最低空闲显存
+15,470,034,944 bytes；test split 与参数公平性账本 mutation 均以 exit 4 被拒绝。由于代码尚未
+提交，要求 clean checkout 的正式 gate 尚未运行，因此这些是 diagnostic evidence，不是已发布
+C3 acceptance。没有运行 HPO、formal training 或 final test，也没有冻结正式 checkpoint 或模型
+性能/科学比较结论。
 
 ## 项目事实源
 

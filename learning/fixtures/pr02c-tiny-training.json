@@ -1,0 +1,85 @@
+{
+  "fixture_version": "0.1.0",
+  "fixture_kind": "objgauss.pr02c-tiny-training",
+  "rollout_times_s": [0.1, 0.2, 0.5, 1.1],
+  "symmetry_rotations_wxyz": [
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0]
+  ],
+  "groups": [
+    {
+      "group_id": "tiny-train-group",
+      "split": "train",
+      "branches": [
+        {
+          "branch_id": "hold",
+          "target_object_id": "target",
+          "commanded_action": {"kind": "hold", "vector_W_N": [0.0, 0.0, 0.0], "duration_s": 0.1},
+          "initial_object_states": [
+            {"object_id": "context", "position_W_m": [0.4, 0.2, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"object_id": "target", "position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ],
+          "future_target_states": [
+            {"position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ]
+        },
+        {
+          "branch_id": "push-pos-x-weak",
+          "target_object_id": "target",
+          "commanded_action": {"kind": "push", "vector_W_N": [0.35, 0.0, 0.0], "duration_s": 0.1},
+          "initial_object_states": [
+            {"object_id": "context", "position_W_m": [0.4, 0.2, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"object_id": "target", "position_W_m": [0.0, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ],
+          "future_target_states": [
+            {"position_W_m": [0.004, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.04, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.008, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.035, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.014, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.015, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.016, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "tiny-validation-group",
+      "split": "validation",
+      "branches": [
+        {
+          "branch_id": "hold",
+          "target_object_id": "target",
+          "commanded_action": {"kind": "hold", "vector_W_N": [0.0, 0.0, 0.0], "duration_s": 0.1},
+          "initial_object_states": [
+            {"object_id": "context", "position_W_m": [-0.4, 0.2, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"object_id": "target", "position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ],
+          "future_target_states": [
+            {"position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ]
+        },
+        {
+          "branch_id": "push-pos-x-weak",
+          "target_object_id": "target",
+          "commanded_action": {"kind": "push", "vector_W_N": [0.35, 0.0, 0.0], "duration_s": 0.1},
+          "initial_object_states": [
+            {"object_id": "context", "position_W_m": [-0.4, 0.2, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"object_id": "target", "position_W_m": [0.01, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ],
+          "future_target_states": [
+            {"position_W_m": [0.014, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.04, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.018, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.035, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.024, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.015, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]},
+            {"position_W_m": [0.026, 0.0, 0.02], "quaternion_WO_wxyz": [1.0, 0.0, 0.0, 0.0], "linear_velocity_W_m_s": [0.0, 0.0, 0.0], "angular_velocity_W_rad_s": [0.0, 0.0, 0.0]}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -25,8 +25,8 @@ guard 已实现。正式 spec 不硬编码提交，而由运行时注入当前 c
 attempts；独立 audit、1210-entry checksum index 与 Delivery verifier 均为 `supported`，source
 commit 与 HEAD 一致。该 SHA 的 PR-00、runtime、writer、independent audit、frozen cohort 与
 acceptance delivery 六项远端 Actions 全部成功。任何后续 `main` HEAD 若未保持这些门成功，
-PR-01 状态自动重开。PR-02C C0 之外的模型、训练、Gaussian dynamics、外部数据、RGB/GPU
-renderer 和机器人控制均未实现。
+PR-01 状态自动重开。PR-02C 当前只新增 C3 minimal Object GNN/golden trainer；Gaussian
+dynamics、外部数据、RGB/GPU renderer 和机器人控制均未实现。
 
 PR-02 的主要预注册决策已经完成：唯一 primary endpoint 是 held-out sibling groups 上 target
 object 的多步 `effect-vs-hold` ObjectState error；使用全新隔离 ManiSkill cohort、最小 Object
@@ -35,7 +35,7 @@ GNN、独立 `learning/`/纯 PyTorch 栈、全门联合 verdict 和 `02A`–`02F
 wall-hours 和 100 GiB ignored artifacts。PR-02A 已在本地建立 7 个 `0.3.0` schema 文件、6 种
 精确分派记录、6 个正向 fixtures 与 39 个负例；旧 5 个 contract 文件哈希保持冻结，machine
 report `3b1e64a0…acccca3f` 和 `npm run check` 均为 `supported`。该实现已提交但尚无远端 CI
-证据；仍没有模型代码或训练证据。
+证据；C3 后续只增加 narrow golden smoke，不构成模型性能或科学训练证据。
 
 PR-02B 已获授权、实现并提交：冻结输入 manifest、与 PR-01/正式 cohort 隔离的 12-group source spec、
 canonical/reverse cohort order、两份独立 source audit、对称性校正 calibration、功效/正式 data
@@ -76,6 +76,14 @@ canonical payload checksum、120 份 `0.3.0` prediction publication、canonical/
 绑定 SHA `9ea2b92`：C1 重建 60 groups / 300 branches / 0 failures，data index
 `970b9359…2e745` 与 16 checks supported；C2 覆盖 12 validation groups / 60 branches / 120
 predictions，18 checks 全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`；单
-prediction corruption mutation 以 exit 4 被 contract/checksum/math/repeat 四层拒绝。PR-02C 当前
-状态为 `c2_committed_local_supported`，尚无远端 CI。仍没有 learned model、trainer、HPO、
-checkpoint、test prediction、模型指标、Gaussian dynamics 或机器人控制；下一切片是 C3。
+prediction corruption mutation 以 exit 4 被 contract/checksum/math/repeat 四层拒绝。
+
+C3 已在工作区实现纯 PyTorch minimal Object GNN、action-free/action-conditioned 两 arm、四区间
+variable-`Δt` open-loop rollout、COM 作用点/target-only action injection、symmetry-aware loss、
+validation-only golden checkpoint selection、`0.3.0` trial/attempt/checkpoint/prediction lineage、
+独立 checkpoint/verifier 和 clean gate。CPU tiny CLI 为 `supported`；宿主 GPU canonical/reverse
+diagnostic repeat 的 24/24 checks 通过，semantic index 为 `709f6f76…d3db`，两 arm 各 35,734
+参数，峰值显存 68,277,760 bytes，最低空闲显存 15,470,034,944 bytes；test split 与参数账本
+mutation 均以 exit 4 被拒绝。当前状态为 `c3_implemented_pending_clean_acceptance`：实现尚未提交，
+所以 `./scripts/check-pr02c-trainer` 的 clean gate 尚未运行。没有 HPO、正式冻结 checkpoint、test
+prediction、模型指标、Gaussian dynamics 或机器人控制证据。

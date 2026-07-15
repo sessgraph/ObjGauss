@@ -41,10 +41,13 @@ failures，data index `970b9359…2e745` 与 16 项 checks supported；C2 在 60
 发布 120 predictions，18 项 checks、canonical/reverse semantic index `17488a15…7c647`、corruption
 mutation rejection 和 checksums 均 supported。
 
-当前开放动作是 C3 learned arms/trainer：实现共享最小 Object GNN 的 action-free 与
-action-conditioned 两个 arms、variable-`Δt` open-loop rollout、parameter/update/data-order parity、
-trial/attempt/checkpoint lineage，并先通过 CPU tiny fixture 与宿主 GPU golden clean repeat。当前
-仍没有 test source/prediction、HPO 结果、checkpoint、模型性能或科学比较证据。
+当前开放动作是关闭 C3 clean acceptance。共享 minimal Object GNN、action-free 与
+action-conditioned 两 arm、variable-`Δt` open-loop rollout、parameter/update/data-order parity、
+trial/attempt/checkpoint lineage 和独立 verifier 已在工作区实现。CPU tiny 与宿主 GPU
+canonical/reverse diagnostic repeat 已通过 24/24 checks，semantic index 为 `709f6f76…d3db`；test
+split 与参数账本 mutation 均被拒绝。下一步需取得提交授权后提交实现，再从 clean checkout 运行
+`./scripts/check-pr02c-trainer`。当前仍没有 test source/prediction、HPO 结果、正式冻结 checkpoint、
+模型性能或科学比较证据。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB

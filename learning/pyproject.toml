@@ -15,6 +15,8 @@ dependencies = [
 objgauss-pr02c-runtime = "objgauss_learning.runtime:main"
 objgauss-pr02c-data = "objgauss_learning.data:main"
 objgauss-pr02c-baselines = "objgauss_learning.baselines:main"
+objgauss-pr02c-trainer = "objgauss_learning.trainer:main"
+objgauss-pr02c-checkpoint-audit = "objgauss_learning.checkpoint:main"
 
 [tool.uv]
 default-groups = []

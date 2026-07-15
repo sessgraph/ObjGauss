@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LEARNING_ROOT="$ROOT/learning"
+OUTPUT_ROOT="$ROOT/generated/pr02c"
+PUBLISH_ROOT="$OUTPUT_ROOT/trainer"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  printf 'invalid: PR-02C C3 acceptance requires a clean checkout\n' >&2
+  exit 4
+fi
+if [[ -n "${OBJGAUSS_NODE:-}" ]]; then
+  NODE_BIN="$OBJGAUSS_NODE"
+elif [[ "$(node --version 2>/dev/null || true)" == "v24.18.0" ]]; then
+  NODE_BIN="$(command -v node)"
+elif [[ -x "$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node" ]]; then
+  NODE_BIN="$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node"
+else
+  printf 'blocked: Node v24.18.0 is unavailable\n' >&2
+  exit 3
+fi
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+export OBJGAUSS_NODE="$NODE_BIN"
+export PYTHONDONTWRITEBYTECODE=1
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/trainer.XXXXXX")"
+LEARNING_VENV="$WORK_ROOT/learning-venv"
+CANONICAL="$WORK_ROOT/canonical"
+REVERSE="$WORK_ROOT/reverse"
+MUTATION="$WORK_ROOT/mutation"
+PUBLISH="$WORK_ROOT/publish"
+TINY_REPORT="$WORK_ROOT/tiny-report.json"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+# Provision C3 before the nested C2/C1 gates rotate their isolated environments.
+# Locked package installation is the only network-capable phase.
+export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
+uv sync --project "$LEARNING_ROOT" --frozen --no-dev
+
+./scripts/check-pr02c-baselines
+
+export UV_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+npm run check
+"$LEARNING_VENV/bin/python" -m unittest discover \
+  -s "$LEARNING_ROOT/tests" -p 'test_*.py' -v
+"$NODE_BIN" --test tests/pr02c-trainer.test.mjs
+
+"$LEARNING_VENV/bin/objgauss-pr02c-trainer" \
+  --repo-root "$ROOT" \
+  --mode tiny \
+  --device cpu \
+  --output "${TINY_REPORT#"$ROOT/"}"
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+"$LEARNING_VENV/bin/objgauss-pr02c-trainer" \
+  --repo-root "$ROOT" \
+  --mode golden \
+  --device cuda \
+  --data-root generated/pr02c/data \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --output-root "${CANONICAL#"$ROOT/"}" \
+  --artifact-prefix generated/pr02c/trainer \
+  --node "$NODE_BIN" \
+  --order canonical
+"$LEARNING_VENV/bin/objgauss-pr02c-trainer" \
+  --repo-root "$ROOT" \
+  --mode golden \
+  --device cuda \
+  --data-root generated/pr02c/data \
+  --formal-spec generated/pr02b/evidence/freeze/formal-data-spec.json \
+  --dynamics-experiment generated/pr02b/evidence/freeze/dynamics-experiment.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --output-root "${REVERSE#"$ROOT/"}" \
+  --artifact-prefix generated/pr02c/trainer \
+  --node "$NODE_BIN" \
+  --order reverse
+
+"$NODE_BIN" scripts/verify-pr02c-trainer.mjs \
+  --root "${CANONICAL#"$ROOT/"}" \
+  --repeat-root "${REVERSE#"$ROOT/"}" \
+  --manifest learning/trainer-manifest.json \
+  --runtime-report generated/pr02c/runtime/report.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --checkpoint-auditor "$LEARNING_VENV/bin/objgauss-pr02c-checkpoint-audit" \
+  --output "${CANONICAL#"$ROOT/"}/verification-report.json"
+
+# Trainer/HPO/selector depth defense must reject final test before touching data.
+set +e
+"$LEARNING_VENV/bin/objgauss-pr02c-trainer" \
+  --repo-root "$ROOT" \
+  --mode golden \
+  --device cuda \
+  --splits test >/dev/null
+TEST_SPLIT_EXIT=$?
+set -e
+if [[ "$TEST_SPLIT_EXIT" -ne 4 ]]; then
+  printf 'invalid: trainer accepted or mishandled final test split\n' >&2
+  exit 4
+fi
+
+# The independent verifier must reject a fairness ledger mutation.
+cp -a "$CANONICAL" "$MUTATION"
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+const path = process.argv[1];
+const value = JSON.parse(readFileSync(path, "utf8"));
+value.arms[0].parameter_count += 1;
+writeFileSync(path, `${JSON.stringify(value)}\n`);
+' "${MUTATION#"$ROOT/"}/index.json"
+set +e
+"$NODE_BIN" scripts/verify-pr02c-trainer.mjs \
+  --root "${MUTATION#"$ROOT/"}" \
+  --repeat-root "${REVERSE#"$ROOT/"}" \
+  --manifest learning/trainer-manifest.json \
+  --runtime-report generated/pr02c/runtime/report.json \
+  --source-commit "$SOURCE_COMMIT" \
+  --checkpoint-auditor "$LEARNING_VENV/bin/objgauss-pr02c-checkpoint-audit" \
+  --output "${MUTATION#"$ROOT/"}/verification-report.json" >/dev/null
+MUTATION_EXIT=$?
+set -e
+if [[ "$MUTATION_EXIT" -ne 4 ]]; then
+  printf 'invalid: independent verifier accepted or mishandled fairness mutation\n' >&2
+  exit 4
+fi
+rm -rf -- "$MUTATION"
+
+mv "$CANONICAL" "$PUBLISH"
+mv "$TINY_REPORT" "$PUBLISH/"
+(
+  cd "$PUBLISH"
+  find . -type f -print0 | sort -z | xargs -0 sha256sum > "$WORK_ROOT/checksums.sha256"
+)
+mv "$WORK_ROOT/checksums.sha256" "$PUBLISH/checksums.sha256"
+(
+  cd "$PUBLISH"
+  sha256sum --quiet -c checksums.sha256
+)
+
+rm -rf -- "$LEARNING_VENV" "$REVERSE"
+rm -rf -- "$PUBLISH_ROOT"
+mv "$PUBLISH" "$PUBLISH_ROOT"
+trap - EXIT
+rm -rf -- "$WORK_ROOT"
+
+"$NODE_BIN" --input-type=module -e '
+import { readFileSync } from "node:fs";
+const report = JSON.parse(readFileSync("generated/pr02c/trainer/report.json", "utf8"));
+const verification = JSON.parse(readFileSync("generated/pr02c/trainer/verification-report.json", "utf8"));
+console.log(JSON.stringify({
+  verdict: verification.verdict,
+  source_commit: verification.source_commit,
+  arms: verification.counts.arms,
+  predictions: verification.counts.predictions,
+  checks: verification.counts.checks,
+  optimizer_updates_per_arm: report.counts.optimizer_updates_per_arm,
+  semantic_index_sha256: report.semantic_index_sha256,
+  minimum_display_vram_free_bytes: report.resources.minimum_display_vram_free_bytes,
+  peak_vram_bytes: report.resources.peak_vram_bytes,
+  evidence_root: "generated/pr02c/trainer",
+}));
+'

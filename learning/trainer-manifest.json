@@ -1,0 +1,129 @@
+{
+  "manifest_version": "0.1.0",
+  "manifest_kind": "objgauss.pr02c-golden-trainer",
+  "arms": ["action_free", "action_conditioned"],
+  "architecture": {
+    "model_family": "minimal-object-gnn",
+    "state_width": 13,
+    "action_feature_width": 9,
+    "hidden_width": 64,
+    "object_encoder_layers": 2,
+    "pairwise_message_layers": 2,
+    "message_passing_rounds": 1,
+    "aggregation": "mean",
+    "shared_residual_head_layers": 2,
+    "activation": "silu",
+    "action_injection": "target-object-only",
+    "action_application_point": "target-object-center-of-mass-zero-in-object-frame",
+    "action_free_input": "learned-mask-token",
+    "action_conditioned_input": "learned-mask-token-plus-interval-action",
+    "parameter_parity_required": true
+  },
+  "rollout": {
+    "unit": "physical_seconds",
+    "boundaries_s": [0.0, 0.1, 0.2, 0.5, 1.1],
+    "delta_t_s": [0.1, 0.1, 0.3, 0.6],
+    "transition_parameters": "shared-across-all-intervals",
+    "teacher_forcing": "initial-state-only",
+    "commanded_action_clipping": "per-interval-active-duration-and-fraction",
+    "executed_action_is_feature": false,
+    "gt_future_is_model_input": false,
+    "quaternion_normalization": "every-transition",
+    "non_finite_fallback_allowed": false
+  },
+  "loss": {
+    "name": "normalized-open-loop-branch-rollout",
+    "target_scope": "intervention.target_object_id",
+    "component_weights": {
+      "position": 0.25,
+      "orientation": 0.25,
+      "linear_velocity": 0.25,
+      "angular_velocity": 0.25
+    },
+    "normalization_scales": {
+      "position": 0.014703245192199387,
+      "orientation": 0.00033644301922148125,
+      "linear_velocity": 0.09083031897380531,
+      "angular_velocity": 0.011206615557372438
+    },
+    "orientation": "finite-wxyz-symmetry-corrected-geodesic",
+    "validation_selection": "group-first-target-object-effect-vs-hold"
+  },
+  "golden": {
+    "config_id": "golden-h64-lr1e3",
+    "training_seed": 2026071501,
+    "hidden_width": 64,
+    "learning_rate": 0.001,
+    "weight_decay": 0.00001,
+    "batch_size_max": 64,
+    "gradient_clip_norm": 1.0,
+    "optimizer_updates": 8,
+    "epochs": 8,
+    "train_group_id": "group-pr02-train-object-01-pr02-train-layout-01-pr02-train-start-01-seed-27071001",
+    "validation_group_id": "group-pr02-validation-object-01-pr02-validation-layout-01-pr02-validation-start-01-seed-27072001",
+    "hpo_config_selected": false,
+    "formal_checkpoint_frozen": false
+  },
+  "tiny": {
+    "fixture_path": "learning/fixtures/pr02c-tiny-training.json",
+    "device": "cpu",
+    "optimizer_updates": 2,
+    "epochs": 2
+  },
+  "resources": {
+    "training_peak_vram_bytes_max": 12884901888,
+    "display_vram_reserve_bytes_min": 1073741824,
+    "gpu_hours_charged_to_hpo": false,
+    "gpu_hours_charged_to_formal": false
+  },
+  "frozen_inputs": {
+    "data_boundary_manifest": {
+      "path": "learning/data-boundary-manifest.json",
+      "sha256": "7fbb1f1635d542623bf34c78fcb59bd2be7f432e5193fbc04c25eb1476b01a7f"
+    },
+    "baseline_manifest": {
+      "path": "learning/baseline-manifest.json",
+      "sha256": "8832e689ebb08339603418edbc9469d848b79b7c38072cb5e7fae503d0d3dda5"
+    },
+    "runtime_lock": {
+      "path": "learning/uv.lock",
+      "sha256": "a90c27d88e5e469593c608b1b865adab9fd57ac7e36dceb54256930fa8de7eb5"
+    },
+    "hyperparameter_grid": {
+      "path": "contracts/fixtures/pr02b/hyperparameter-grid.json",
+      "sha256": "f95e34a47cf624f7f8dc6cdcc4c159aa4eb7cb9f8354f86bfbed4158d79a51be"
+    },
+    "formal_data_spec": {
+      "runtime_path": "generated/pr02b/evidence/freeze/formal-data-spec.json",
+      "sha256": "770d116b8f25cf1300497981d02a9d1243db7331cd302633db43e5c10f06ea63"
+    },
+    "dynamics_experiment": {
+      "runtime_path": "generated/pr02b/evidence/freeze/dynamics-experiment.json",
+      "contract_kind": "objgauss.dynamics_experiment",
+      "schema_version": "0.3.0"
+    },
+    "schemas": {
+      "common": "a40d0dc44303db092882af6b47de82a9d19c35a028ffacc33424476afba10fc4",
+      "training_trial": "bf544789cbb6fdd2ba23462c4d78c0b4b04f84c73113f2c1b3406438a9666559",
+      "training_attempt": "2d06c74cab109b214c7daf4e4142b0c4936072dd2d6ae2c9fc2110fe3549212a",
+      "checkpoint_manifest": "c1b991af682d00048412875e81480ba2bd55a40c2200652237ccf08a79ed2822",
+      "dynamics_prediction": "34866e6c27f0ba68fc40a1092ee6bf404122d1c67ec832d08817081c1467c7d9"
+    }
+  },
+  "outputs": {
+    "root": "generated/pr02c/trainer/",
+    "atomic_publish_required": true,
+    "git_ignored": true
+  },
+  "claim_boundary": {
+    "supported_claim": "minimal-learned-arms-train-reproducibly-with-fair-golden-lineage",
+    "excluded_claims": [
+      "hpo-config-selected",
+      "formal-checkpoint-frozen",
+      "test-source-or-prediction-produced",
+      "learned-model-performance",
+      "scientific-baseline-comparison",
+      "gaussian-dynamics-value"
+    ]
+  }
+}

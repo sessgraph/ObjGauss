@@ -5,9 +5,10 @@
 > 提交，但尚未取得远端 CI 证据；PR-02B 已提交，并在代码承载 SHA `04ddb18` 上完成 clean
 > acceptance，pilot/data freeze 为本地 `supported`；PR-02C 已获动作授权，提交 `fc20023` 的
 > C0 runtime gate 已通过 clean GPU 验收，代码承载 SHA `adb1a62` 的 C1 data boundary clean
-> gate 也已通过；提交 `9ea2b92` 的 C2 deterministic baselines 已通过 clean acceptance，下一切片
-> 为 C3 learned arms/trainer
-> 版本：0.25
+> gate 也已通过；提交 `9ea2b92` 的 C2 deterministic baselines 已通过 clean acceptance；C3
+> learned arms/trainer 已在工作区实现并通过 CPU tiny 与宿主 GPU diagnostic repeat，正式 clean
+> acceptance 仍待实现提交后运行
+> 版本：0.26
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -100,8 +101,10 @@
 >   `2501ebc2…17a81b5` 一致并得到 `supported`。C2 已由提交 `9ea2b92` 实现 sanitized validation
 >   bundle、copy-state、constant-velocity、120 份 raw predictions、独立 18-check verifier 与 clean
 >   gate；正式 clean acceptance 的 C1 data index 为 `970b9359…2e745`，C2 canonical/reverse semantic
->   index 为 `17488a15…7c647`，状态是 `c2_committed_local_supported`。仍未建立 learned model、
->   trainer、checkpoint 或模型结果。
+>   index 为 `17488a15…7c647`，状态是 `c2_committed_local_supported`。C3 已在工作区建立 minimal
+>   Object GNN、trainer、trial/attempt/checkpoint/prediction lineage 与独立 verifier；CPU tiny 和
+>   GPU canonical/reverse diagnostic repeat 的 24 项 checks 通过，semantic index 为
+>   `709f6f76…d3db`。实现尚未提交，clean acceptance、HPO、formal training 与 final test 均未运行。
 > - `decision`：PR-02C 只物化 48 train + 12 validation groups；12 个 final test groups 在
 >   PR-02E 配置/checkpoint 冻结前只保留 PR-02B spec，不生成 episode、trajectory 或 GT future。
 >   PR-02C 出现任何 test 数据产物均为 `invalid`，不能只依赖 loader 权限补救。
@@ -704,12 +707,13 @@ training seeds；HPO/formal 基础调度为 6/4 小时，含 5% 技术重试保�
 独立 audits、语义顺序不变性、GPU 显示保留、`0.3.0` 验证和 checksums 全部通过；pilot report
 SHA-256 为 `47ad53c6…944cc`。其唯一权威入口仍是 `./scripts/check-pr02b-pilot`，后续代码 HEAD
 不得静默继承本次证据。PR-02C 的依赖已解除且已获 Owner 动作授权；C0 runtime/contract gate
-已由 `fc20023` 实现并通过 clean GPU 验收，尚未运行训练。详细取舍与失败账本见
+已由 `fc20023` 实现并通过 clean GPU 验收；该 C0 历史结果本身未运行训练。C3 现已完成工作区
+golden diagnostic，但仍待 clean acceptance。详细取舍与失败账本见
 [`ADR-005`](adr/0005-pr02b-pilot-data-freeze.md)。
 
 ### PR-02C 授权后实施计划
 
-PR-02C 当前状态为 `c2_committed_local_supported`，其唯一假设是独立 clean GPU runtime 能在
+PR-02C 当前状态为 `c3_implemented_pending_clean_acceptance`，其唯一假设是独立 clean GPU runtime 能在
 不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，可复现地产生
 四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。C0 只支持该假设的
 runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比较仍由 PR-02D/PR-02E 完成。
@@ -735,11 +739,13 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
    isolation 与 canonical/reverse repeat。提交 `9ea2b92` 的 clean gate 已以 120 predictions、18
    checks、corruption mutation rejection 和 checksums 得到 `supported`；该结果不支持 learned
    model 或科学性能声明。
-5. C3 再实现 action-free 与 action-conditioned 两个 learned arms；二者共享 backbone、四区间
-   variable-`Δt` transition、参数量、updates、数据顺序、grid 和 seeds，不得回改 C2 baseline
-   语义或把其输出当作模型性能结论。
-6. 先通过 CPU tiny fixture 与宿主 GPU golden clean repeat，再运行 24 个 HPO tasks；只用
-   validation 冻结每个 learned arm 的单一 config，保留全部 trial/attempt 结果。
+5. C3 已在工作区实现 action-free 与 action-conditioned 两个 learned arms；二者共享 backbone、
+   四区间 variable-`Δt` transition、参数量、updates、数据顺序、grid 和 seed，并建立独立
+   checkpoint semantic audit 与 `0.3.0` lineage。未回改 C2 baseline 语义，也不把 golden 输出
+   当作模型性能结论。
+6. CPU tiny fixture 与宿主 GPU golden diagnostic repeat 已通过；正式 clean repeat 仍须在实现
+   提交后运行。只有 clean gate 通过且 Owner 继续授权后才进入 24 个 HPO tasks；当前不得只用
+   diagnostic 结果冻结 config。
 7. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
    validation-selected checkpoint、train/validation predictions、machine report 和 checksums。
 
@@ -1243,5 +1249,8 @@ Owner 选择。
    承载 SHA `adb1a62` 的 `./scripts/check-pr02c-data` 以 60 groups / 300 branches、0 failures 和
    16 项独立 checks 得到 `supported`。C2 deterministic baselines 已由提交 `9ea2b92` 实现并通过
    clean acceptance：60 validation branches、120 predictions、18 checks、canonical/reverse repeat、
-   corruption mutation 与 checksums 均通过。下一步是 C3 action-free/action-conditioned learned
-   arms 与 trainer；当前没有 checkpoint、test prediction 或模型性能证据。
+   corruption mutation 与 checksums 均通过。C3 minimal Object GNN/trainer 已在工作区实现；CPU
+   tiny 与 GPU canonical/reverse diagnostic repeat 的 24 checks 通过，semantic index 为
+   `709f6f76…d3db`，test split 和公平性账本 mutation 均被拒绝。下一步是取得提交授权后提交 C3，
+   再从 clean checkout 运行 `./scripts/check-pr02c-trainer`；当前没有 HPO、正式冻结 checkpoint、
+   test prediction 或模型性能证据。

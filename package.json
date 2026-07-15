@@ -19,12 +19,14 @@
     "test:pr02c": "node --test tests/pr02c-runtime.test.mjs",
     "test:pr02c-data": "node --test tests/pr02c-data.test.mjs",
     "test:pr02c-baselines": "node --test tests/pr02c-baselines.test.mjs",
+    "test:pr02c-trainer": "node --test tests/pr02c-trainer.test.mjs",
     "test": "node --test tests/*.test.mjs",
     "syntax": "node scripts/check-syntax.mjs",
     "verify:pr01f": "node scripts/verify-pr01-delivery.mjs",
     "check:pr02c-runtime": "./scripts/check-pr02c-runtime",
     "check:pr02c-data": "./scripts/check-pr02c-data",
     "check:pr02c-baselines": "./scripts/check-pr02c-baselines",
+    "check:pr02c-trainer": "./scripts/check-pr02c-trainer",
     "check": "npm run build && npm run contract:audit && npm run contract:pr01a && npm run contract:pr02a && npm test && npm run syntax"
   },
   "devDependencies": {
