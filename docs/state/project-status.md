@@ -63,10 +63,11 @@ reserve probe、独立 verifier 和失败语义。提交 `fc20023` 的 clean
 allocation cap 为 12 GiB。C0 状态是 `c0_committed_local_supported`，尚无远端 CI；其后已进入
 C1 train/validation cohort 与 fail-closed loader，C0 状态继续保持。
 
-C1 已实现冻结 source plan、train/validation-only simulator producer、独立纯 Python
+C1 已提交冻结 source plan、train/validation-only simulator producer、独立纯 Python
 checksum/lineage loader 和不导入两侧实现的 Node verifier。Loader 的 model input 只含初态、
 commanded action、target object 和四个物理 rollout times；future GT 单独进入 labels，executed
-action 不进入 feature。dirty-tree 精确 runtime 诊断生成 48 train + 12 validation groups、300
-branches、0 failed attempts，producer、loader 与 16 项独立 checks 对 data index
-`ce6e6bd9…20c209` 一致。当前状态为 `c1_implemented_pending_clean_acceptance`；尚未物化 test，
-也没有 baseline、模型、trainer、checkpoint、模型指标、Gaussian dynamics 或机器人控制。
+action 不进入 feature。代码承载 SHA `adb1a62` 的 clean gate 生成 48 train + 12 validation groups、
+300 branches、0 failed attempts，producer、loader 与 16 项独立 checks 对 data index
+`2501ebc2…17a81b5` 一致。当前状态为 `c1_committed_local_supported`；尚未物化 test，也没有
+baseline、模型、trainer、checkpoint、模型指标、Gaussian dynamics 或机器人控制。下一切片是
+C2 deterministic baselines。

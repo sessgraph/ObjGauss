@@ -10,8 +10,9 @@
 - 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 与 PR-02B
   pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C Trainer/Baselines 已获动作
   授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已由提交 `fc20023` 实现并通过
-  clean GPU 验收；C1 train/validation source 与 fail-closed loader 已实现、等待 clean HEAD
-  验收，模型与 trainer 尚未实现。准确动态状态以 `docs/state/` 为准。
+  clean GPU 验收；C1 train/validation source 与 fail-closed loader 已提交并通过 clean HEAD
+  验收，下一切片是 C2 deterministic baselines，模型与 trainer 尚未实现。准确动态状态以
+  `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
@@ -234,7 +235,7 @@ loader 只暴露初态、commanded action 与 rollout times，future GT 单独�
 | PR-02C C0 unit tests | `npm run test:pr02c` 与 `uv run --project learning --frozen --no-dev python -m unittest discover -s learning/tests -p 'test_runtime.py'`；分别覆盖 manifest/lock 静态门与 Python runtime 失败语义 |
 | PR-02C C0 clean runtime gate | `./scripts/check-pr02c-runtime`；要求 clean checkout、Node 24.18.0、uv 0.11.17、CPython 3.10.20、精确 `learning/uv.lock`、离线且无 simulator 的新 venv，并验证 CUDA 13.0、12 GiB cap、至少 1 GiB 显示显存保留、HEAD/lock/grid lineage 与独立 verifier |
 | PR-02C C1 unit tests | `npm run test:pr02c-data`、`OBJGAUSS_REPO_ROOT="$PWD" PYTHONPATH=sim/src python3 -m unittest sim.tests.test_pr02_data` 与 `uv run --project learning --frozen --no-dev python -m unittest discover -s learning/tests -p 'test_data.py'`；不物化正式 source |
-| PR-02C C1 clean data gate | `./scripts/check-pr02c-data`；要求 clean checkout，先重建 PR-02B freeze 与 C0 runtime，再仅物化/审计 48 train + 12 validation groups，运行无 simulator loader 和独立 300-branch verifier；发现 test artifact、坏 checksum/lineage、executed/future model feature 或跨 split identity 即 `invalid` |
+| PR-02C C1 clean data gate | `./scripts/check-pr02c-data`；要求 clean checkout；锁定且校验哈希的 package install 是唯一可联网阶段，执行项目代码前必须切换 offline；随后重建 PR-02B freeze 与 C0 runtime，仅物化/审计 48 train + 12 validation groups，运行无 simulator loader 和独立 300-branch verifier；发现 test artifact、坏 checksum/lineage、executed/future model feature 或跨 split identity 即 `invalid` |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。

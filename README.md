@@ -312,12 +312,13 @@ dynamics 价值声明；当前尚无远端 CI。
 sibling groups。`sim/` producer 生成 300 个 `0.2.0` episodes；独立 `learning/` loader 重算
 publication/descriptor checksums 和 lineage，只把初态、commanded action、target 与四个物理 rollout
 times 暴露为 model inputs，future ObjectState 只进入独立 labels。Node verifier 不导入 producer 或
-loader 实现，并独立重算 contract、split、final isolation 与同一 data index。
+loader 实现，并独立重算 contract、split、final isolation 与同一 data index。锁定且校验哈希的
+package install 是唯一可联网阶段；执行 producer、loader 与所有验收代码前会切换为 offline。
 
-当前状态是 `c1_implemented_pending_clean_acceptance`。dirty-tree 真实诊断已生成 60 groups / 300
-branches，0 failed attempts；producer、loader 与 16 项独立 checks 对同一 data index
-`ce6e6bd9…20c209` 均为 `supported`。该诊断不替代提交后 clean evidence；C1 不物化 12 个 test
-groups，也不支持 baseline、trainer、模型性能或科学结论。
+当前状态是 `c1_committed_local_supported`。代码承载 SHA `adb1a62` 的 clean gate 生成 60 groups /
+300 branches、0 failed attempts；producer、loader 与 16 项独立 checks 对同一 data index
+`2501ebc2…17a81b5` 均为 `supported`。C1 没有物化 12 个 test groups，也不支持 baseline、trainer、
+模型性能或科学结论；下一切片是 C2 deterministic baselines，尚未实现。
 
 ## 项目事实源
 
