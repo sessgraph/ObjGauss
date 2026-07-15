@@ -55,9 +55,10 @@ PR-02A 只证明 `0.3.0` 能表达 dynamics evidence，尚未提供可执行的 
   horizon、尺度、`δ`、seed/group 数或搜索空间。
 - 代理功效不支持模型表现声明。实际 trial/seed 方差必须在 PR-02C ledger 中完整报告，正式
   scientific verdict 仍由 PR-02D 独立 evaluator 和 PR-02E 一次性 final experiment 决定。
-- 当前 dirty-worktree diagnostic 的 source audits、GPU probe 与 21 项 freeze verifier 为
-  `supported`，但 clean acceptance 尚未运行，因此 PR-02B 动态状态仍是
-  `implemented_pending_clean_acceptance`。
+- 实现与审计路径修复已由 `b99b5f1`、`04ddb18` 提交。代码承载 SHA `04ddb18` 的 clean
+  acceptance 中，两遍 source audits、顺序语义、GPU probe、21 项 freeze verifier、lineage
+  与 checksums 均为 `supported`；PR-02B 动态状态提升为 `committed_local_supported`。
+- PR-02C 只解除前置依赖，不自动获得动作授权；pilot proxy 不支持 trainer 或模型表现声明。
 
 ## 验证
 
@@ -67,5 +68,7 @@ PYTHONPATH=sim/src python3 -m unittest sim.tests.test_pr02_pilot
 ./scripts/check-pr02b-pilot
 ```
 
-前两项已在当前工作区通过；最后一项按设计拒绝 dirty checkout，必须在提交后的 clean HEAD
-重跑。该边界不支持 trainer、模型性能、Gaussian dynamics、外部数据或机器人控制声明。
+三项均已通过；完整门在代码承载 SHA `04ddb18` 的 clean checkout 运行，两遍各 12 groups /
+60 episodes、0 failed/extra attempts，21 项 verification supported，pilot report SHA-256 为
+`47ad53c6…944cc`。该边界不支持 trainer、模型性能、Gaussian dynamics、外部数据或机器人
+控制声明；后续代码 HEAD 必须重跑完整门。

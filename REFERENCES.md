@@ -312,17 +312,22 @@ intervention 写成 robot controller 或 measured real action。
    方差，所有候选仅约 7%–11% proxy power；该结果因量纲不一致标为无效排障证据。修正版使用
    `δ * effect_sigma / abs(median_normalized_effect)`，并明确 bootstrap group-mean 只是 training
    seed sensitivity proxy，不是已观察的模型跨 seed 性能。
-4. 修正版 dirty diagnostic 选择 12 test groups / 3 training seeds，冻结候选 48/12/12 split、
+4. 修正版 dirty diagnostic 选择 12 test groups / 3 training seeds，产生候选 48/12/12 split、
    `δ=0.1`、`δ_shuffle=0.06`；基础调度为 `6h HPO + 4h formal`，含 5% 技术重试保留后为
    `6.3h + 4.2h = 10.5h`。宿主 RTX 5060 Ti 上 16 MiB probe 前后
    空闲显存均约 15.67 GB，12 GiB training cap 外保留 1 GiB 显示显存；这不是 trainer 性能或
    GPU simulator/render 证据。
+5. 实现与审计路径修复由 `b99b5f1`、`04ddb18` 提交。代码承载 SHA `04ddb18` 的 clean
+   `./scripts/check-pr02b-pilot` 两遍各生成 12 groups / 60 episodes、0 failed/extra attempts，
+   墙钟约 `47.89 s` / `48.19 s`，两份独立 source audit、顺序语义一致性、GPU 1 GiB reserve、
+   21 项 freeze verification 与 checksum index 全部 `supported`。权威 pilot report SHA-256
+   为 `47ad53c6c83742df9ea2e9658e1bab1b56042279cf7b0be85033663e910944cc`，冻结上项候选为正式
+   PR-02B 输入；ignored evidence 位于 `generated/pr02b/evidence/`，不提交 Git。
 
-以上修正版仍在 dirty worktree 上运行，source commit lineage 不满足最终门，因此当前状态只是
-`approved_local_diagnostic`，不是 PR-02B `supported`。唯一权威验收是实现提交后在同一 clean
-HEAD 运行 `./scripts/check-pr02b-pilot`；若 source、power、资源、GPU reserve、`0.3.0` contract、
-checksum 或 lineage 任一失败，必须保留对应 `rejected`、`blocked` 或 `invalid`，不得用本节
-数值替代。
+PR-02B 当前资源状态为 `approved_local_clean_freeze`。唯一权威复验仍是同一 clean HEAD 运行
+`./scripts/check-pr02b-pilot`；后续代码提交不能静默继承 `04ddb18` 的 evidence。若 source、power、
+资源、GPU reserve、`0.3.0` contract、checksum 或 lineage 任一失败，必须保留对应 `rejected`、
+`blocked` 或 `invalid`。本账本不批准外部数据下载，也不把 GPU probe 扩大为训练或渲染证据。
 
 ## 新项目候选数据源
 

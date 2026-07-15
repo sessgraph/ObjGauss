@@ -7,12 +7,13 @@
 
 ### 当前事实
 
-- 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 已在本地
-  实现、通过项目门并提交；PR-02B pilot/data freeze 已获授权并建立专用 clean-head 验收门，
-  PR-02C trainer 尚未授权。准确动态状态以 `docs/state/` 为准。
+- 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 与 PR-02B
+  pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C trainer 尚未授权。准确动态
+  状态以 `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
-  机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family。
+  机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
+  calibration/power freeze。
 - 拟议研究方向：对象中心、动作条件的 Gaussian 世界模型；方向、完成层级和阈值仍是
   working_assumption，只有 Owner 明确确认后才是 decision。
 - Owner 已确认实现路径按“一个 PR 只引入一个可证伪假设”拆分，并由 PR-04 实验裁决

@@ -258,19 +258,21 @@ PR-01D 独立 auditor 重算 source gates，随后校准器才冻结物理时间
 `0.3.0` dynamics experiment verifier。GPU 探针必须在 12 GiB 单进程上限之外，为桌面显示保留
 至少 1 GiB 实际可用显存。产物只写入 ignored `generated/pr02b/evidence/`，不得提交。
 
-当前未提交工作区上的排障运行已发现并保留两条负证据：首版过重 calibration object 的 weak
+排障运行发现并保留两条负证据：首版过重 calibration object 的 weak
 push 未过既有 `0.0014 m` source 门；首版 power analyzer 又把物理 effect 的绝对方差直接当作
 error-reduction 方差，因量纲错误被判为 `blocked`。修正对象支持范围和相对异质性代理后，
-canonical/reverse 两份 source audit 与非最终 freeze verifier 均通过；诊断值为 horizon
+代码承载 SHA `04ddb18` 的 clean acceptance 中，canonical/reverse 两份 source audit 与 freeze
+verifier 均通过；权威冻结值为 horizon
 `1.1 s`、评分点 `[0.1, 0.2, 0.5, 1.1] s`、正式 `48/12/12` groups、3 个 training seeds、
 `δ=0.1`、`δ_shuffle=0.06`，基础调度 `6 + 4 = 10 GPU-hours`，含 5% 技术重试保留后为
-`6.3 + 4.2 = 10.5 GPU-hours`。宿主探针观察到约 15.67 GB 可用
-显存并保留 1 GiB，实际只分配 16 MiB。
+`6.3 + 4.2 = 10.5 GPU-hours`。宿主 16 MiB probe 后仍有 15.64 GB 可用显存并保留 1 GiB。
+两遍各生成 12 groups / 60 episodes、0 failed/extra attempts，21 项 verification 与总 checksum
+index 全部通过；pilot report SHA-256 为 `47ad53c6…944cc`，ignored evidence 位于
+`generated/pr02b/evidence/`。
 
-这些数值仍是 dirty-worktree diagnostic，不是权威 freeze：只有实现提交后在该 clean HEAD 上
-重新运行上述唯一入口，且 machine report、`0.3.0` experiment、checksums 与 lineage 全部通过，
-PR-02B 才能标记为 `supported`。本切片不创建 `learning/`、不训练模型，也不支持任何模型性能、
-Gaussian dynamics、外部数据泛化或机器人控制声明。长期取舍见
+PR-02B 因此为本地 `supported`，但尚无远端 CI。本切片不创建 `learning/`、不训练模型，也不
+支持任何模型性能、Gaussian dynamics、外部数据泛化或机器人控制声明；PR-02C 仍需 Owner
+单独授权。长期取舍见
 [`ADR-005`](docs/adr/0005-pr02b-pilot-data-freeze.md)。
 
 ## 项目事实源

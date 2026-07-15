@@ -38,16 +38,17 @@ wall-hours 和 100 GiB ignored artifacts。PR-02A 已在本地建立 7 个 `0.3.
 report `3b1e64a0…acccca3f` 和 `npm run check` 均为 `supported`。该实现已提交但尚无远端 CI
 证据；仍没有模型代码或训练证据。
 
-PR-02B 已获授权并实现：冻结输入 manifest、与 PR-01/正式 cohort 隔离的 12-group source spec、
+PR-02B 已获授权、实现并提交：冻结输入 manifest、与 PR-01/正式 cohort 隔离的 12-group source spec、
 canonical/reverse cohort order、两份独立 source audit、对称性校正 calibration、功效/正式 data
 freeze、4-config 最小 Object GNN grid、1 GiB 桌面显存保留探针和 clean-head verifier。排障中首版
 过重 object 被既有 source gate 正确拒绝，随后首版 power 计算又因量纲错误得到 blocked；两条
-负证据均未通过放宽阈值解决。修正后的 dirty diagnostic 得到 48/12/12 formal groups、3 seeds、
-`δ=0.1`、`δ_shuffle=0.06` 与含 5% retry reserve 的 10.5 GPU-hours 调度，宿主 16 MiB probe
-保留了至少 1 GiB 显存，
-21 项 freeze verification supported。
+负证据均未通过放宽阈值解决。
 
-该运行发生在未提交工作区，不能绑定最终 source commit，因此不是 PR-02B 权威证据。当前状态
-为 `implemented_pending_clean_acceptance`；只有提交后在同一 clean HEAD 运行
-`./scripts/check-pr02b-pilot` 并通过，才能关闭 PR-02B。PR-02C 尚未授权，`learning/`、trainer、
-checkpoint、模型指标、Gaussian dynamics 和机器人控制仍未实现。
+实现与路径修复分别由 `b99b5f1`、`04ddb18` 提交。代码承载 SHA `04ddb18` 的 clean
+`./scripts/check-pr02b-pilot` 完整通过：canonical/reverse 各 12 groups / 60 episodes、0 failed/
+extra attempts，两份独立 source audit、跨顺序语义一致性、GPU 1 GiB 显示保留、21 项 freeze
+verification 与 evidence checksums 均为 `supported`。权威 pilot report SHA-256 为
+`47ad53c6…944cc`，冻结 48/12/12 formal groups、3 seeds、`δ=0.1`、`δ_shuffle=0.06` 和含 5%
+retry reserve 的 10.5 GPU-hours 调度。当前状态为 `committed_local_supported`，尚无远端 CI
+证据。PR-02C 的前置依赖已满足但尚未授权；`learning/`、trainer、checkpoint、模型指标、
+Gaussian dynamics 和机器人控制仍未实现。
