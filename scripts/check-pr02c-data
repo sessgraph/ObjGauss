@@ -40,9 +40,6 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export PYTHONDONTWRITEBYTECODE=1
 
-./scripts/check-pr02b-pilot
-./scripts/check-pr02c-runtime
-
 mkdir -p "$OUTPUT_ROOT"
 WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/data.XXXXXX")"
 SIM_VENV="$WORK_ROOT/sim-venv"
@@ -70,6 +67,12 @@ uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev
 export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
 uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
 uv sync --project "$LEARNING_ROOT" --frozen --no-dev
+
+# Provision the C1 environments before nested gates exercise and rotate their
+# own temporary environments.  The acceptance runtime remains offline, while
+# C1 no longer depends on a wheel cache entry surviving those nested gates.
+./scripts/check-pr02b-pilot
+./scripts/check-pr02c-runtime
 
 OBJGAUSS_REPO_ROOT="$ROOT" PYTHONPATH="$SIM_ROOT/src" \
   "$SIM_VENV/bin/python" -m unittest sim.tests.test_pr02_data -v

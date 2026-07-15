@@ -68,4 +68,15 @@ test("C1 clean gate is executable and runs C0, PR-02B, producer, loader, and ver
     "verify-pr02c-data.mjs",
     "--splits test",
   ]) assert.ok(gate.includes(required), required);
+
+  const simProvision = gate.indexOf('uv sync --project "$SIM_ROOT"');
+  const learningProvision = gate.indexOf('uv sync --project "$LEARNING_ROOT"');
+  const pilotGate = gate.indexOf("./scripts/check-pr02b-pilot");
+  const runtimeGate = gate.indexOf("./scripts/check-pr02c-runtime");
+  assert.ok(simProvision >= 0 && simProvision < pilotGate, "sim venv must precede nested gates");
+  assert.ok(
+    learningProvision >= 0 && learningProvision < pilotGate,
+    "learning venv must precede nested gates",
+  );
+  assert.ok(pilotGate < runtimeGate, "PR-02B must precede the C0 runtime gate");
 });
