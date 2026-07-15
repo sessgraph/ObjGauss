@@ -25,7 +25,8 @@ guard 已实现。正式 spec 不硬编码提交，而由运行时注入当前 c
 attempts；独立 audit、1210-entry checksum index 与 Delivery verifier 均为 `supported`，source
 commit 与 HEAD 一致。该 SHA 的 PR-00、runtime、writer、independent audit、frozen cohort 与
 acceptance delivery 六项远端 Actions 全部成功。任何后续 `main` HEAD 若未保持这些门成功，
-PR-01 状态自动重开。PR-02C 当前只新增 C3 minimal Object GNN/golden trainer；Gaussian
+PR-01 状态自动重开。PR-02C 当前已在 C3 minimal Object GNN/golden trainer 之后冻结 C6
+HPO/selection 机器 contract；Gaussian
 dynamics、外部数据、RGB/GPU renderer 和机器人控制均未实现。
 
 PR-02 的主要预注册决策已经完成：唯一 primary endpoint 是 held-out sibling groups 上 target
@@ -85,6 +86,12 @@ validation-only golden checkpoint selection、`0.3.0` trial/attempt/checkpoint/p
 重建 C1/C2，C1 data index 为 `dd5994a3…1a30`；CPU tiny 与宿主 GPU canonical/reverse golden
 的 24/24 checks 通过，semantic index 为 `709f6f76…d3db`，两 arm 各 35,734 参数，峰值显存
 68,277,760 bytes，最低空闲显存 15,633,416,192 bytes；test split 与参数账本 mutation 均以 exit 4
-被拒绝，发布目录的 24-entry artifact checksum index 已复核。当前状态为
-`c3_committed_local_supported`，尚无远端 CI。
-没有 HPO、正式冻结 checkpoint、test prediction、模型指标、Gaussian dynamics 或机器人控制证据。
+被拒绝，发布目录的 24-entry artifact checksum index 已复核。`4498bd6` 与状态提交 `1c0d6ed`
+已推送，但远端尚无 PR-02C CPU workflow，因此 C3 准确状态为
+`c3_pushed_gpu_local_supported`。
+
+C6 的唯一机器执行 contract 已冻结在 `learning/hpo-manifest.json`：2 learned arms × 4 configs ×
+3 seeds 形成 24 个 tasks / 12 个 fairness pairs；clean runner commit 只生成一次共享
+`hpo_data_index`，独立 selector 按 ADR-006 为每个 arm 选择一个 config，并要求 canonical/reverse
+输入顺序重放一致。当前没有 runner、selector、PR-02C CPU workflow、HPO、正式冻结 checkpoint、
+test prediction、模型指标、Gaussian dynamics 或机器人控制证据。

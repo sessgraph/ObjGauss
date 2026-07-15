@@ -176,6 +176,28 @@ log 与 PR-02C acceptance report，由 verifier 重算；不为此修改已冻�
 实现可以分成可审查提交，但仍属于一个 PR 和一个假设；任一步失败不得通过拆 PR、换 seed、
 扩大 grid 或修改阈值绕过。
 
+### C6 机器执行 contract
+
+[`learning/hpo-manifest.json`](../../learning/hpo-manifest.json) 是 C6 task、pair、config、selector、
+资源、retry、输出和声明边界的唯一机器源。它把 ADR 已批准的矩阵展开为 12 个固定 fairness
+pairs / 24 个固定 task IDs，并明确以下执行语义：
+
+- 每个 `config_id + training_seed` 配对 `action_free` 与 `action_conditioned`；二者共享初始化
+  seed/算法、数据与 batch/group 顺序、updates、训练预算和 checkpoint policy；只要求公共参数
+  子树的初始化 digest 相同，arm-specific 子树各自确定性，不能要求整个 checkpoint 字节相同；
+- `4498bd6` 是 trainer contract commit；C3 的 `dd5994a3…1a30` data index 与两个 semantic
+  indexes 只作为 reference。C6 必须在 clean runner commit 下原子生成一次新的
+  `hpo-data-index.json`，24 个 tasks 共同消费，单 task 不得重建或替换数据；
+- selector 不导入 trainer 排名逻辑，只按 12 validation groups 的 group-first score、三个 seeds
+  等权平均和精确分数平局时的 `config_id` 字典序，为两个 learned arms 各选一个 config；不设
+  performance promotion threshold，也不以近似平局、资源或运行顺序改变选择；
+- canonical/reverse 是同一组冻结结果的 selector 输入顺序重放，不是额外 HPO arm 或 task；
+- formal training 只用 train 拟合，validation 只选择 checkpoint；HPO checkpoint 不晋升为 formal
+  checkpoint。
+
+C6 的唯一交付是确定性的双配置映射及完整 task/pair/checksum/data lineage。它不关闭 PR-02C，
+不产生模型性能 verdict；C7 仍须从头运行六个 formal tasks。
+
 ## 最低测试与验收
 
 - Feature/action encoding、quaternion normalization、symmetry-aware loss、irregular physical-time

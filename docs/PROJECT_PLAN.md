@@ -714,7 +714,9 @@ C3 现已通过完整 clean acceptance。详细取舍与失败账本见
 
 ### PR-02C 授权后实施计划
 
-PR-02C 当前状态为 `c3_committed_local_supported`，其唯一假设是独立 clean GPU runtime 能在
+PR-02C 当前状态为 `c6_spec_frozen`；C3 的两个提交已推送，宿主 GPU golden 仍绑定 `4498bd6`，
+但远端尚无 PR-02C CPU workflow，因此 C3 只可写为 `c3_pushed_gpu_local_supported`。PR-02C 的
+唯一假设是独立 clean GPU runtime 能在
 不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，可复现地产生
 四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。C0 只支持该假设的
 runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比较仍由 PR-02D/PR-02E 完成。
@@ -747,7 +749,12 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
 6. 提交 `4498bd6` 的 CPU tiny fixture 与宿主 GPU golden clean repeat 已通过；24 项独立 checks、
    semantic repeat、test-split 拒绝、参数账本 mutation 和资源门均 supported。下一门是 24 个
    HPO tasks；当前尚未运行，也没有用 golden 结果冻结 config。
-7. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
+7. C6 机器 contract 已在 [`learning/hpo-manifest.json`](../learning/hpo-manifest.json) 冻结：
+   `2 learned arms × 4 configs × 3 seeds = 24 tasks`，组成 12 个 fairness pairs；C3 data index
+   只作 reference，clean runner commit 必须只生成一次共享 `hpo_data_index`。独立 selector 按
+   ADR-006 为两个 arms 各冻结一个 config，并做 canonical/reverse 输入顺序重放；当前尚未实现
+   runner、selector 或 PR-02C CPU workflow，也未运行 HPO。
+8. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
    validation-selected checkpoint、train/validation predictions、machine report 和 checksums。
 
 PR-02C 完整门包括 semantic repeat、baseline/parameter fairness、final/future isolation、
@@ -1253,5 +1260,6 @@ Owner 选择。
    corruption mutation 与 checksums 均通过。提交 `4498bd6` 的 C3 minimal Object GNN/trainer 已
    通过完整 clean acceptance：C1 data index `dd5994a3…1a30`，CPU tiny 与 GPU canonical/reverse
    golden 的 24 checks supported，semantic index 为 `709f6f76…d3db`，test split 和公平性账本
-   mutation 均被拒绝。下一步是 C6 的 24-task HPO/config freeze；当前没有 HPO、正式冻结
-   checkpoint、test prediction 或模型性能证据。
+   mutation 均被拒绝；`4498bd6` 与状态提交 `1c0d6ed` 已推送。C6 的 task/pair/selector contract
+   已冻结为 `learning/hpo-manifest.json`；下一步实现 runner、独立 selector、CPU workflow 与负例，
+   然后才运行 24-task HPO。当前没有 HPO、正式冻结 checkpoint、test prediction 或模型性能证据。

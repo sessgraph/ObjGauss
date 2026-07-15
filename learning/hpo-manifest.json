@@ -1,0 +1,314 @@
+{
+  "manifest_version": "0.1.0",
+  "manifest_kind": "objgauss.pr02c-c6-hpo-selection",
+  "hypothesis": "the-frozen-24-task-matrix-deterministically-selects-one-config-per-learned-arm-without-final-test-access",
+  "lineage": {
+    "trainer_contract_commit": "4498bd603558ecf80ad0591edab0413ea52acb18",
+    "c3_acceptance_commit": "1c0d6edca862c17e15217828ef1143690545c001",
+    "runner_commit_policy": "runtime-current-clean-git-head",
+    "workflow_commit_policy": "same-as-runner-commit",
+    "hpo_data_build_commit_policy": "same-as-runner-commit",
+    "c3_references": {
+      "data_index_sha256": "dd5994a3334482c94268d129b141a51edcc092687e1d7d24410c305ab8721a30",
+      "model_input_index_sha256": "225248d2c7af8dd26477c469efe3e947dcd8a83351d98719f2aa38db46a633d1",
+      "baseline_semantic_index_sha256": "17488a153be1ac283295af035416524ebc99f6dc054caa5e28bcc0331d77c647",
+      "trainer_semantic_index_sha256": "709f6f761ce2df3b23c8f60fd5eb1669a9a3d7fa1bf80b6f58a3a320ae24d3db"
+    },
+    "frozen_inputs": {
+      "trainer_manifest": {
+        "path": "learning/trainer-manifest.json",
+        "sha256": "2ad6b350a40bddc65ed882beba5a3528498ffc13cf88f190a0d0e0633ee2576a"
+      },
+      "data_boundary_manifest": {
+        "path": "learning/data-boundary-manifest.json",
+        "sha256": "7fbb1f1635d542623bf34c78fcb59bd2be7f432e5193fbc04c25eb1476b01a7f"
+      },
+      "baseline_manifest": {
+        "path": "learning/baseline-manifest.json",
+        "sha256": "8832e689ebb08339603418edbc9469d848b79b7c38072cb5e7fae503d0d3dda5"
+      },
+      "runtime_lock": {
+        "path": "learning/uv.lock",
+        "sha256": "a90c27d88e5e469593c608b1b865adab9fd57ac7e36dceb54256930fa8de7eb5"
+      },
+      "hyperparameter_grid": {
+        "path": "contracts/fixtures/pr02b/hyperparameter-grid.json",
+        "sha256": "f95e34a47cf624f7f8dc6cdcc4c159aa4eb7cb9f8354f86bfbed4158d79a51be"
+      }
+    }
+  },
+  "data_build": {
+    "allowed_splits": ["train", "validation"],
+    "forbidden_split": "test",
+    "build_count": 1,
+    "shared_by_all_tasks": true,
+    "atomic_publish_required": true,
+    "hpo_data_index_record": "hpo-data-index.json",
+    "source_commit_field": "runner_commit",
+    "c3_data_index_is_reference_only": true
+  },
+  "matrix": {
+    "learned_arms": ["action_free", "action_conditioned"],
+    "training_seeds": [2026071501, 2026071502, 2026071503],
+    "configurations": [
+      {
+        "config_id": "hpo-h064-lr0p0003",
+        "config_sha256": "7197afb5f09087ae6e01699be1fe9382e5016a3f78d4e3f160cf4f15c52bb5f2",
+        "values": {
+          "batch_size": 64,
+          "checkpoint_selection": "minimum-validation-primary-error-per-seed",
+          "early_stopping_patience_epochs": 20,
+          "epochs_max": 200,
+          "gradient_clip_norm": 1.0,
+          "hidden_width": 64,
+          "learning_rate": 0.0003,
+          "optimizer": "adamw",
+          "optimizer_updates_max": 20000,
+          "weight_decay": 0.00001
+        }
+      },
+      {
+        "config_id": "hpo-h064-lr0p0010",
+        "config_sha256": "7cbe072f2c20a767036050e0ba0dd4bf9cc5b2d940c07f145499e903f123303b",
+        "values": {
+          "batch_size": 64,
+          "checkpoint_selection": "minimum-validation-primary-error-per-seed",
+          "early_stopping_patience_epochs": 20,
+          "epochs_max": 200,
+          "gradient_clip_norm": 1.0,
+          "hidden_width": 64,
+          "learning_rate": 0.001,
+          "optimizer": "adamw",
+          "optimizer_updates_max": 20000,
+          "weight_decay": 0.00001
+        }
+      },
+      {
+        "config_id": "hpo-h128-lr0p0003",
+        "config_sha256": "f69206c00fb1628fae9142d69d943035ca248f99cb0a63d5266cded47dcfda5a",
+        "values": {
+          "batch_size": 64,
+          "checkpoint_selection": "minimum-validation-primary-error-per-seed",
+          "early_stopping_patience_epochs": 20,
+          "epochs_max": 200,
+          "gradient_clip_norm": 1.0,
+          "hidden_width": 128,
+          "learning_rate": 0.0003,
+          "optimizer": "adamw",
+          "optimizer_updates_max": 20000,
+          "weight_decay": 0.00001
+        }
+      },
+      {
+        "config_id": "hpo-h128-lr0p0010",
+        "config_sha256": "30a961ad5a5f9e41062b6467d280bfd3131fca6f30bd7aeed17dfecbe0b435a0",
+        "values": {
+          "batch_size": 64,
+          "checkpoint_selection": "minimum-validation-primary-error-per-seed",
+          "early_stopping_patience_epochs": 20,
+          "epochs_max": 200,
+          "gradient_clip_norm": 1.0,
+          "hidden_width": 128,
+          "learning_rate": 0.001,
+          "optimizer": "adamw",
+          "optimizer_updates_max": 20000,
+          "weight_decay": 0.00001
+        }
+      }
+    ],
+    "fairness_pairs": [
+      {
+        "pair_id": "pair-hpo-h064-lr0p0003-s2026071501",
+        "config_id": "hpo-h064-lr0p0003",
+        "training_seed": 2026071501,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0003-s2026071501",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0003-s2026071501"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h064-lr0p0003-s2026071502",
+        "config_id": "hpo-h064-lr0p0003",
+        "training_seed": 2026071502,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0003-s2026071502",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0003-s2026071502"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h064-lr0p0003-s2026071503",
+        "config_id": "hpo-h064-lr0p0003",
+        "training_seed": 2026071503,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0003-s2026071503",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0003-s2026071503"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h064-lr0p0010-s2026071501",
+        "config_id": "hpo-h064-lr0p0010",
+        "training_seed": 2026071501,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0010-s2026071501",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0010-s2026071501"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h064-lr0p0010-s2026071502",
+        "config_id": "hpo-h064-lr0p0010",
+        "training_seed": 2026071502,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0010-s2026071502",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0010-s2026071502"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h064-lr0p0010-s2026071503",
+        "config_id": "hpo-h064-lr0p0010",
+        "training_seed": 2026071503,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h064-lr0p0010-s2026071503",
+          "action_conditioned": "task-action-conditioned-hpo-h064-lr0p0010-s2026071503"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0003-s2026071501",
+        "config_id": "hpo-h128-lr0p0003",
+        "training_seed": 2026071501,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0003-s2026071501",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0003-s2026071501"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0003-s2026071502",
+        "config_id": "hpo-h128-lr0p0003",
+        "training_seed": 2026071502,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0003-s2026071502",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0003-s2026071502"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0003-s2026071503",
+        "config_id": "hpo-h128-lr0p0003",
+        "training_seed": 2026071503,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0003-s2026071503",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0003-s2026071503"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0010-s2026071501",
+        "config_id": "hpo-h128-lr0p0010",
+        "training_seed": 2026071501,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0010-s2026071501",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0010-s2026071501"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0010-s2026071502",
+        "config_id": "hpo-h128-lr0p0010",
+        "training_seed": 2026071502,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0010-s2026071502",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0010-s2026071502"
+        }
+      },
+      {
+        "pair_id": "pair-hpo-h128-lr0p0010-s2026071503",
+        "config_id": "hpo-h128-lr0p0010",
+        "training_seed": 2026071503,
+        "task_ids": {
+          "action_free": "task-action-free-hpo-h128-lr0p0010-s2026071503",
+          "action_conditioned": "task-action-conditioned-hpo-h128-lr0p0010-s2026071503"
+        }
+      }
+    ],
+    "pair_count": 12,
+    "task_count": 24,
+    "attempt_id_algorithm": "attempt-{task_id}-a{ordinal-two-digits}"
+  },
+  "fairness": {
+    "pair_members_share": [
+      "initialization_seed",
+      "initialization_algorithm",
+      "data_order_sha256",
+      "batch_group_sequence_sha256",
+      "optimizer_updates_max",
+      "epochs_max",
+      "training_budget",
+      "checkpoint_policy"
+    ],
+    "initialization_digest_policy": {
+      "common_parameter_subtree": "must-match-within-pair",
+      "arm_specific_parameter_subtree": "independent-but-deterministic",
+      "whole_checkpoint_bytes": "not-required-to-match"
+    }
+  },
+  "execution": {
+    "task_timeout_seconds": 900,
+    "max_attempts_per_task": 2,
+    "retryable_reason_codes": ["process_crash", "io_failure", "transient_oom"],
+    "seed_or_config_substitution_allowed": false,
+    "successful_task_overwrite_allowed": false,
+    "atomic_task_publish_required": true,
+    "hpo_gpu_hours_base_max": 6.0,
+    "hpo_gpu_hours_with_retry_reserve_max": 6.3,
+    "training_peak_vram_bytes_max": 12884901888,
+    "display_vram_reserve_bytes_min": 1073741824,
+    "optimizer_updates_max": 20000,
+    "epochs_max": 200
+  },
+  "selector": {
+    "implementation_independent_from_trainer_ranking_logic": true,
+    "input_split": "validation",
+    "forbidden_split": "test",
+    "validation_groups_per_seed": 12,
+    "group_aggregation": "equal-weight-group-first-over-five-branches-and-four-scoring-times",
+    "seed_aggregation": "equal-weight-arithmetic-mean-over-three-seeds",
+    "eligibility": "all-three-seed-tasks-complete-contract-valid-checksum-valid-and-lineage-valid",
+    "selection": "minimum-selection-score-per-arm",
+    "tie_breaker": "exact-score-tie-then-config-id-lexicographic",
+    "near_tie_resource_ranking_allowed": false,
+    "performance_promotion_threshold": null,
+    "input_orders": ["canonical", "reverse"],
+    "required_output_mapping_keys": ["action_free", "action_conditioned"]
+  },
+  "verdicts": {
+    "supported": "valid-matrix-produces-one-deterministic-config-per-arm-and-order-replays-match",
+    "rejected": "complete-valid-evidence-fails-the-preregistered-reproducibility-or-fairness-endpoint",
+    "blocked": "dependency-resource-or-legal-retry-exhaustion-leaves-an-arm-with-no-complete-eligible-config",
+    "invalid": "test-leakage-or-task-ledger-id-checksum-config-lineage-or-retry-policy-corruption"
+  },
+  "formal_training_boundary": {
+    "fit_split": "train",
+    "checkpoint_selection_split": "validation",
+    "train_plus_validation_fit_allowed": false,
+    "hpo_checkpoint_promoted_to_formal": false
+  },
+  "outputs": {
+    "root": "generated/pr02c/hpo/",
+    "git_ignored": true,
+    "required_files": [
+      "selected-configs.json",
+      "selection-report.json",
+      "task-index.json",
+      "checksum-index.json",
+      "hpo-data-index.json",
+      "fairness-pair-ledger.json"
+    ]
+  },
+  "claim_boundary": {
+    "supported_claim": "a-deterministic-test-isolated-config-mapping-is-frozen-for-both-learned-arms",
+    "excluded_claims": [
+      "formal-training-complete",
+      "formal-checkpoint-frozen",
+      "test-source-or-prediction-produced",
+      "learned-model-performance",
+      "scientific-baseline-comparison",
+      "gaussian-dynamics-value"
+    ]
+  }
+}

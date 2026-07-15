@@ -354,7 +354,7 @@ mean aggregation 与两层 residual head。Action-conditioned 只向 target obje
 encoder 与 learned mask token。两 arm 复用同一四区间 variable-`Δt` transition，只在初态
 teacher-force，并保持参数量、updates、数据顺序、grid 和 seed 公平。
 
-当前状态是 `c3_committed_local_supported`。代码承载 SHA `4498bd6` 的
+当前 C3 运行证据状态是 `c3_pushed_gpu_local_supported`。代码承载 SHA `4498bd6` 的
 `./scripts/check-pr02c-trainer` 从 clean checkout 重建 C1 的 48 train + 12 validation groups / 300
 branches / 0 failures，data index 为 `dd5994a3…1a30`；C2 的 120 predictions 与 18 checks 继续
 supported。C3 CPU tiny 与宿主 GPU canonical/reverse golden 由独立 verifier 完成 24/24 checks，
@@ -363,6 +363,12 @@ semantic index 为 `709f6f76…d3db`，每 arm 35,734 个参数，峰值显存 6
 report SHA-256 为 `096d244e…9869`，verification report 为 `e26512fc…bb40`；发布目录共 25 个
 文件，其中 24 项 artifact checksum index 已复核。没有运行 HPO、formal training 或 final test，
 也没有冻结正式 checkpoint 或模型性能/科学比较结论。
+
+C3 代码与状态提交 `4498bd6`、`1c0d6ed` 已推送；因仓库尚无 PR-02C CPU workflow，准确状态为
+`c3_pushed_gpu_local_supported`，旧 PR-00/PR-01 workflow 不计作 C3 CPU 证据。C6 的唯一机器
+执行 contract 已冻结在 [`learning/hpo-manifest.json`](learning/hpo-manifest.json)：24 个 tasks
+组成 12 个 fairness pairs，在 clean runner commit 下共同消费一次生成的 `hpo_data_index`，独立
+selector 为两个 learned arms 各冻结一个 config。当前尚未实现或运行 C6。
 
 ## 项目事实源
 
