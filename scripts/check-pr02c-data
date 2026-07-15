@@ -33,11 +33,6 @@ fi
 
 export PATH="$(dirname "$NODE_BIN"):$PATH"
 export OBJGAUSS_NODE="$NODE_BIN"
-export UV_OFFLINE=1
-export OBJGAUSS_RUNTIME_OFFLINE=1
-export OBJGAUSS_LEARNING_OFFLINE=1
-export HF_HUB_OFFLINE=1
-export TRANSFORMERS_OFFLINE=1
 export PYTHONDONTWRITEBYTECODE=1
 
 mkdir -p "$OUTPUT_ROOT"
@@ -68,9 +63,16 @@ export UV_PROJECT_ENVIRONMENT="$LEARNING_VENV"
 uv sync --project "$LEARNING_ROOT" --frozen --no-dev --no-install-project --no-build
 uv sync --project "$LEARNING_ROOT" --frozen --no-dev
 
+# Locked, hash-verified package installation is the only network-capable phase.
+# Everything that executes project code, including nested gates, remains offline.
+export UV_OFFLINE=1
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
 # Provision the C1 environments before nested gates exercise and rotate their
-# own temporary environments.  The acceptance runtime remains offline, while
-# C1 no longer depends on a wheel cache entry surviving those nested gates.
+# own temporary environments, so C1 does not depend on cache survival.
 ./scripts/check-pr02b-pilot
 ./scripts/check-pr02c-runtime
 

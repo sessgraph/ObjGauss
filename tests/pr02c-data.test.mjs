@@ -71,12 +71,17 @@ test("C1 clean gate is executable and runs C0, PR-02B, producer, loader, and ver
 
   const simProvision = gate.indexOf('uv sync --project "$SIM_ROOT"');
   const learningProvision = gate.indexOf('uv sync --project "$LEARNING_ROOT"');
+  const offlineBoundary = gate.indexOf("export UV_OFFLINE=1");
   const pilotGate = gate.indexOf("./scripts/check-pr02b-pilot");
   const runtimeGate = gate.indexOf("./scripts/check-pr02c-runtime");
   assert.ok(simProvision >= 0 && simProvision < pilotGate, "sim venv must precede nested gates");
   assert.ok(
     learningProvision >= 0 && learningProvision < pilotGate,
     "learning venv must precede nested gates",
+  );
+  assert.ok(
+    learningProvision < offlineBoundary && offlineBoundary < pilotGate,
+    "only locked installation may precede the offline execution boundary",
   );
   assert.ok(pilotGate < runtimeGate, "PR-02B must precede the C0 runtime gate");
 });
