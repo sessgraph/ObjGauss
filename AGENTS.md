@@ -12,9 +12,9 @@
   授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已由提交 `fc20023` 实现并通过
   clean GPU 验收；C1 train/validation source 与 fail-closed loader 已提交并通过 clean HEAD
   验收；C2 copy-state/constant-velocity deterministic baselines 已由提交 `9ea2b92` 实现并通过
-  clean acceptance。C3 learned arms/trainer 已在工作区实现，CPU tiny 与宿主 GPU
-  canonical/reverse diagnostic repeat 均通过；因实现尚未提交，要求 clean checkout 的正式门
-  `./scripts/check-pr02c-trainer` 尚未运行。准确动态状态以 `docs/state/` 为准。
+  clean acceptance。C3 learned arms/trainer 已由提交 `4498bd6` 实现并通过完整 clean acceptance：
+  CPU tiny、宿主 GPU canonical/reverse golden、24 项独立检查与负例均通过。C6 HPO、formal
+  training 与 final test 尚未运行。准确动态状态以 `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
@@ -187,7 +187,7 @@
 | generated/pr01e/ | Git ignored 的 preflight/formal cohort 与 audit 输出；可重建、不得提交 |
 | generated/pr02a/ | Git ignored 的 PR-02A contract machine report；由正式 audit 重建，不得提交 |
 | generated/pr02b/ | Git ignored 的 PR-02B repeat/audit/freeze evidence；只有 clean gate 生成的 `evidence/` 可用于验收，仍不得提交 |
-| generated/pr02c/ | Git ignored 的 PR-02C runtime、source/loader、baseline、训练与后续证据根；C0/C1/C2 clean gates 分别原子发布 `runtime/`、`data/` 与 `baselines/`，C3 clean gate 将发布 `trainer/`，均不得提交 |
+| generated/pr02c/ | Git ignored 的 PR-02C runtime、source/loader、baseline、训练与后续证据根；C0/C1/C2/C3 clean gates 分别原子发布 `runtime/`、`data/`、`baselines/` 与 `trainer/`，均不得提交 |
 | artifacts/pr01/ | Git ignored 的最终 Delivery 投影；只由 clean-checkout 验收生成，不得提交 |
 | package.json、package-lock.json、.node-version | PR-00 命令、精确依赖解析与 Node runtime 事实源 |
 | .github/workflows/ | PR-00 Node 门与 PR-01 runtime/writer/audit/cohort/delivery 门；不部署或发布 |

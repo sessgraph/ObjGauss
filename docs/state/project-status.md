@@ -78,12 +78,13 @@ canonical payload checksum、120 份 `0.3.0` prediction publication、canonical/
 predictions，18 checks 全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`；单
 prediction corruption mutation 以 exit 4 被 contract/checksum/math/repeat 四层拒绝。
 
-C3 已在工作区实现纯 PyTorch minimal Object GNN、action-free/action-conditioned 两 arm、四区间
+C3 已由提交 `4498bd6` 实现纯 PyTorch minimal Object GNN、action-free/action-conditioned 两 arm、四区间
 variable-`Δt` open-loop rollout、COM 作用点/target-only action injection、symmetry-aware loss、
 validation-only golden checkpoint selection、`0.3.0` trial/attempt/checkpoint/prediction lineage、
-独立 checkpoint/verifier 和 clean gate。CPU tiny CLI 为 `supported`；宿主 GPU canonical/reverse
-diagnostic repeat 的 24/24 checks 通过，semantic index 为 `709f6f76…d3db`，两 arm 各 35,734
-参数，峰值显存 68,277,760 bytes，最低空闲显存 15,470,034,944 bytes；test split 与参数账本
-mutation 均以 exit 4 被拒绝。当前状态为 `c3_implemented_pending_clean_acceptance`：实现尚未提交，
-所以 `./scripts/check-pr02c-trainer` 的 clean gate 尚未运行。没有 HPO、正式冻结 checkpoint、test
-prediction、模型指标、Gaussian dynamics 或机器人控制证据。
+独立 checkpoint/verifier 和 clean gate。正式 `./scripts/check-pr02c-trainer` 从 clean checkout
+重建 C1/C2，C1 data index 为 `dd5994a3…1a30`；CPU tiny 与宿主 GPU canonical/reverse golden
+的 24/24 checks 通过，semantic index 为 `709f6f76…d3db`，两 arm 各 35,734 参数，峰值显存
+68,277,760 bytes，最低空闲显存 15,633,416,192 bytes；test split 与参数账本 mutation 均以 exit 4
+被拒绝，发布目录的 24-entry artifact checksum index 已复核。当前状态为
+`c3_committed_local_supported`，尚无远端 CI。
+没有 HPO、正式冻结 checkpoint、test prediction、模型指标、Gaussian dynamics 或机器人控制证据。
