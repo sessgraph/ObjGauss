@@ -92,8 +92,8 @@ test("the PR-01A manifest freezes every schema and fixture checksum", () => {
   }
 });
 
-test("the exact contract registry has one 0.1.0 entry and four 0.2.0 entries", () => {
-  assert.deepEqual(supportedContractKeys, [
+test("the frozen registry prefix has one 0.1.0 entry and four 0.2.0 entries", () => {
+  assert.deepEqual(supportedContractKeys.filter((key) => !key.startsWith("0.3.0:")), [
     "0.1.0:objgauss.episode",
     "0.2.0:objgauss.episode",
     "0.2.0:objgauss.experiment",
@@ -130,7 +130,7 @@ test("fixture IDs remain manifest values rather than schema constants", () => {
 });
 
 test("latest, unknown versions, and kind/version mismatches fail before schema dispatch", () => {
-  for (const version of ["latest", "0.2", "0.3.0", undefined]) {
+  for (const version of ["latest", "0.2", "0.4.0", undefined]) {
     const document = fixture("episode");
     document.schema_version = version;
     const result = validateContract(document);

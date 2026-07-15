@@ -1,0 +1,66 @@
+{
+  "schema_version": "0.3.0",
+  "contract_kind": "objgauss.training_attempt",
+  "identity": {
+    "experiment_id": "pr02a-fixture-experiment",
+    "trial_id": "trial-action-conditioned-config-a-seed-101",
+    "attempt_id": "attempt-action-conditioned-config-a-seed-101-1",
+    "ordinal": 1,
+    "model_arm": "action_conditioned",
+    "training_seed": 101,
+    "config_sha256": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6"
+  },
+  "timing": {
+    "started_monotonic_s": 100,
+    "finished_monotonic_s": 100.5,
+    "wall_seconds": 0.5
+  },
+  "outcome": {
+    "status": "succeeded",
+    "classification": "none",
+    "reason_code": "none",
+    "message": "Fixture training attempt completed."
+  },
+  "retry": {
+    "max_attempts": 2,
+    "eligible": false,
+    "same_seed": true,
+    "same_config": true,
+    "previous_attempt_id": {
+      "availability": "missing",
+      "reason": "not_applicable"
+    }
+  },
+  "resources": {
+    "gpu_hours": 0.25,
+    "peak_vram_bytes": 2147483648,
+    "minimum_display_vram_free_bytes": 4294967296,
+    "artifact_bytes": 1048576
+  },
+  "outputs": {
+    "training_log": {
+      "availability": "present",
+      "value": {
+        "uri": "generated/pr02c/trials/trial-a/training-log.jsonl",
+        "media_type": "application/jsonl",
+        "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+        "byte_size": 1024
+      }
+    },
+    "checkpoint": {
+      "availability": "present",
+      "value": {
+        "uri": "generated/pr02c/checkpoints/checkpoint-a.safetensors",
+        "media_type": "application/octet-stream",
+        "sha256": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6",
+        "byte_size": 1047552
+      }
+    }
+  },
+  "provenance": {
+    "source_commit": "91bc05e9f3648a44e7e8d161420a26d1c40a5d6f",
+    "source_tree_sha256": "b493d48364afe44d11c0165cf470a4164d1e2609911ef998be868d46ade3de4e",
+    "experiment_spec_sha256": "4f4a9410ffcdf895c4adb880659e9b5c0dd1f23a30790684340b3eaacb045398",
+    "runtime_lock_sha256": "18ac3e7343f016890c510e93f935261169d9e3f565436f47b1c6bf10f2163e71"
+  }
+}

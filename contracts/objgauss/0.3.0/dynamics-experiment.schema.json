@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/dynamics-experiment.schema.json",
+  "title": "ObjGauss PR-02 Dynamics Experiment",
+  "description": "Frozen data, model, endpoint, split, resource, retry, and claim policy for the ObjectState-only dynamics experiment.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "contract_versions",
+    "source",
+    "data_policy",
+    "endpoint",
+    "horizon",
+    "training",
+    "budgets",
+    "retry_policy",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "contract_kind": { "const": "objgauss.dynamics_experiment" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "contract_versions": { "$ref": "#/$defs/contractVersions" },
+    "source": { "$ref": "#/$defs/source" },
+    "data_policy": { "$ref": "#/$defs/dataPolicy" },
+    "endpoint": { "$ref": "#/$defs/endpoint" },
+    "horizon": { "$ref": "#/$defs/horizon" },
+    "training": { "$ref": "#/$defs/training" },
+    "budgets": { "$ref": "#/$defs/budgets" },
+    "retry_policy": { "$ref": "#/$defs/retryPolicy" },
+    "claim_boundary": { "$ref": "#/$defs/claimBoundary" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+    },
+    "sha256": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+    },
+    "artifactDescriptor": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/artifactDescriptor"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["experiment_id", "fixture_id", "preregistration_sha256"],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "fixture_id": { "$ref": "#/$defs/identifier" },
+        "preregistration_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "contractVersions": {
+      "type": "object",
+      "required": ["source_episode", "dynamics_records"],
+      "properties": {
+        "source_episode": { "const": "0.2.0" },
+        "dynamics_records": { "const": "0.3.0" }
+      },
+      "unevaluatedProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": ["simulator", "sapien", "runtime_lock_sha256", "source_gate_report_sha256", "source_gate_status"],
+      "properties": {
+        "simulator": { "const": "mani-skill==3.0.1" },
+        "sapien": { "const": "sapien==3.0.3" },
+        "runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "source_gate_report_sha256": { "$ref": "#/$defs/sha256" },
+        "source_gate_status": { "const": "supported" }
+      },
+      "unevaluatedProperties": false
+    },
+    "idSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "splitPartition": {
+      "type": "object",
+      "required": ["object_identity_ids", "layout_ids", "group_ids", "group_count"],
+      "properties": {
+        "object_identity_ids": { "$ref": "#/$defs/idSet" },
+        "layout_ids": { "$ref": "#/$defs/idSet" },
+        "group_ids": { "$ref": "#/$defs/idSet" },
+        "group_count": { "type": "integer", "minimum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "dataPolicy": {
+      "type": "object",
+      "required": [
+        "source_kind",
+        "pr01_groups_excluded",
+        "new_cohort_required",
+        "split_unit",
+        "isolation_keys",
+        "pilot_freeze",
+        "calibration",
+        "train",
+        "validation",
+        "test",
+        "final_access"
+      ],
+      "properties": {
+        "source_kind": { "const": "maniskill-programmatic-cpu-primitive" },
+        "pr01_groups_excluded": { "const": true },
+        "new_cohort_required": { "const": true },
+        "split_unit": { "const": "sibling_group" },
+        "isolation_keys": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "object_identity_id" },
+            { "const": "layout_id" },
+            { "const": "group_id" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "pilot_freeze": {
+          "type": "object",
+          "required": ["report_sha256", "excluded_from_training", "excluded_from_final_statistics", "freezes"],
+          "properties": {
+            "report_sha256": { "$ref": "#/$defs/sha256" },
+            "excluded_from_training": { "const": true },
+            "excluded_from_final_statistics": { "const": true },
+            "freezes": {
+              "type": "array",
+              "prefixItems": [
+                { "const": "horizon_and_scoring_times" },
+                { "const": "normalization_scales" },
+                { "const": "delta" },
+                { "const": "delta_shuffle" },
+                { "const": "split_group_counts" },
+                { "const": "training_seeds" },
+                { "const": "training_configuration" }
+              ],
+              "items": false,
+              "minItems": 7,
+              "maxItems": 7
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        "calibration": { "$ref": "#/$defs/splitPartition" },
+        "train": { "$ref": "#/$defs/splitPartition" },
+        "validation": { "$ref": "#/$defs/splitPartition" },
+        "test": { "$ref": "#/$defs/splitPartition" },
+        "final_access": {
+          "type": "object",
+          "required": [
+            "trainer_loader_rejects_test",
+            "inference_reads_gt_future",
+            "evaluator_only_reads_gt_future",
+            "max_formal_runs"
+          ],
+          "properties": {
+            "trainer_loader_rejects_test": { "const": true },
+            "inference_reads_gt_future": { "const": false },
+            "evaluator_only_reads_gt_future": { "const": true },
+            "max_formal_runs": { "const": 1 }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "componentScales": {
+      "type": "object",
+      "required": ["position", "orientation", "linear_velocity", "angular_velocity"],
+      "properties": {
+        "position": { "type": "number", "exclusiveMinimum": 0 },
+        "orientation": { "type": "number", "exclusiveMinimum": 0 },
+        "linear_velocity": { "type": "number", "exclusiveMinimum": 0 },
+        "angular_velocity": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "endpoint": {
+      "type": "object",
+      "required": [
+        "name",
+        "target_scope",
+        "components",
+        "component_weights",
+        "normalization",
+        "normalization_scales",
+        "aggregation",
+        "confidence_level",
+        "baselines",
+        "delta",
+        "delta_shuffle"
+      ],
+      "properties": {
+        "name": { "const": "target-object-multistep-effect-vs-hold-objectstate-error" },
+        "target_scope": { "const": "intervention.target_object_id" },
+        "components": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "position" },
+            { "const": "orientation_symmetry_corrected" },
+            { "const": "linear_velocity" },
+            { "const": "angular_velocity" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "component_weights": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/componentWeights"
+        },
+        "normalization": { "const": "max-pilot-robust-scale-evaluator-noise-floor" },
+        "normalization_scales": { "$ref": "#/$defs/componentScales" },
+        "aggregation": { "const": "group-first-paired-hierarchical-bootstrap" },
+        "confidence_level": { "const": 0.95 },
+        "baselines": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "copy_state" },
+            { "const": "constant_velocity" },
+            { "const": "action_free" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "delta": { "type": "number", "exclusiveMinimum": 0 },
+        "delta_shuffle": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "horizon": {
+      "type": "object",
+      "required": ["unit", "duration_s", "scoring_times_s", "covers_action", "covers_settling"],
+      "properties": {
+        "unit": { "const": "physical_seconds" },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "scoring_times_s": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "number", "exclusiveMinimum": 0 }
+        },
+        "covers_action": { "const": true },
+        "covers_settling": { "const": true }
+      },
+      "unevaluatedProperties": false
+    },
+    "training": {
+      "type": "object",
+      "required": [
+        "model_family",
+        "message_passing_rounds",
+        "prediction_action",
+        "executed_action_is_feature",
+        "loss",
+        "teacher_forcing",
+        "arms",
+        "training_seeds",
+        "checkpoint_selection",
+        "hyperparameter_grid"
+      ],
+      "properties": {
+        "model_family": { "const": "minimal-object-gnn" },
+        "message_passing_rounds": { "const": 1 },
+        "prediction_action": { "const": "commanded_action" },
+        "executed_action_is_feature": { "const": false },
+        "loss": { "const": "normalized-open-loop-branch-rollout" },
+        "teacher_forcing": { "const": "initial-state-only" },
+        "arms": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "copy_state" },
+            { "const": "constant_velocity" },
+            { "const": "action_free" },
+            { "const": "action_conditioned" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "training_seeds": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+        },
+        "checkpoint_selection": { "const": "minimum-validation-primary-error-per-seed" },
+        "hyperparameter_grid": { "$ref": "#/$defs/artifactDescriptor" }
+      },
+      "unevaluatedProperties": false
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "gpu_hours_total_max",
+        "gpu_hours_pilot_hpo_max",
+        "gpu_hours_formal_max",
+        "training_peak_vram_bytes_max",
+        "display_vram_reserve_bytes_min",
+        "cohort_cpu_wall_hours_max",
+        "artifact_bytes_max"
+      ],
+      "properties": {
+        "gpu_hours_total_max": { "const": 24 },
+        "gpu_hours_pilot_hpo_max": { "const": 8 },
+        "gpu_hours_formal_max": { "const": 16 },
+        "training_peak_vram_bytes_max": { "const": 12884901888 },
+        "display_vram_reserve_bytes_min": { "const": 1073741824 },
+        "cohort_cpu_wall_hours_max": { "const": 8 },
+        "artifact_bytes_max": { "const": 107374182400 }
+      },
+      "unevaluatedProperties": false
+    },
+    "retryPolicy": {
+      "type": "object",
+      "required": ["max_attempts_per_task", "max_extra_attempt_fraction", "same_seed_config", "eligible_failures", "scientific_retry_allowed"],
+      "properties": {
+        "max_attempts_per_task": { "const": 2 },
+        "max_extra_attempt_fraction": { "const": 0.05 },
+        "same_seed_config": { "const": true },
+        "eligible_failures": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "process_crash" },
+            { "const": "io_failure" },
+            { "const": "transient_oom" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "scientific_retry_allowed": { "const": false }
+      },
+      "unevaluatedProperties": false
+    },
+    "claimBoundary": {
+      "type": "object",
+      "required": ["hypothesis", "excluded_claims"],
+      "properties": {
+        "hypothesis": { "const": "commanded-action-conditioned-objectstate-dynamics-beats-all-preregistered-baselines" },
+        "excluded_claims": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "gaussian-dynamics-value" },
+            { "const": "external-data-generalization" },
+            { "const": "robot-control" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -6,7 +6,8 @@
 
 | 风险 | 当前状态 | 控制措施 | 解除证据 |
 | --- | --- | --- | --- |
-| `0.1.0` 被后续 contract 静默改变 | active | 固定字节 SHA、版本分派测试、禁止 migrator | PR-01A 门持续验证 hash `b619…a9c` |
+| 已发布 `0.1.0`/`0.2.0` 被静默改变或跨版本误分派 | active | 固定 5 个旧文件 SHA、精确 version+kind 分派、禁止 migrator | PR-02A 本地门冻结旧 hashes 并通过 39 个负例 |
+| PR-02A schema-valid 被误写成 pilot/模型能力 | active | machine report 声明边界、状态源分账、PR-02B 独立授权 | 当前只记录 local contract supported；无数据/模型/指标 claim |
 | Writer 与 evaluator 共享逻辑导致伪独立 | active | PR-01D 禁止导入 writer；从 raw artifacts 重算 | mutation matrix 与源码依赖审计通过 |
 | 未审计定义就批量生成导致 cohort 返工 | mitigated_local | PR-01D 先于 PR-01E；preflight 与 formal 分账 | D audit、冻结 preflight 与 48-group formal audit 均 supported |
 | Pilot runtime 无法在 clean CI 重建 | mitigated_remote | 精确 lock、clean-venv wheel-only install、真实 smoke；缺 runtime fail/blocked | `234ba00` 远端 runtime、writer、cohort 与 delivery 均成功 |

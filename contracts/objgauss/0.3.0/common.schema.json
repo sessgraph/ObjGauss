@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json",
+  "title": "ObjGauss PR-02 Shared Contract Definitions",
+  "description": "Shared scalar, identifier, artifact, availability, provenance, and verdict definitions. This file is not a dispatchable record kind.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9][a-zA-Z0-9._/-]*$"
+    },
+    "artifactDescriptor": {
+      "type": "object",
+      "required": ["uri", "media_type", "sha256", "byte_size"],
+      "properties": {
+        "uri": { "$ref": "#/$defs/artifactPath" },
+        "media_type": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byte_size": { "type": "integer", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableArtifact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "$ref": "#/$defs/artifactDescriptor" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": {
+              "enum": ["not_produced", "not_applicable", "invalidated", "blocked"]
+            }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "availableNumber": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "type": "number" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": {
+              "enum": ["not_produced", "not_applicable", "invalidated", "blocked"]
+            }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "availableIdentifier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "present" },
+            "value": { "$ref": "#/$defs/identifier" }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["availability", "reason"],
+          "properties": {
+            "availability": { "const": "missing" },
+            "reason": { "enum": ["not_applicable", "not_produced", "blocked"] }
+          },
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "split": {
+      "enum": ["calibration", "train", "validation", "test", "fixture"]
+    },
+    "modelArm": {
+      "enum": ["copy_state", "constant_velocity", "action_free", "action_conditioned"]
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["status", "reason_code"],
+      "properties": {
+        "status": { "enum": ["supported", "rejected", "blocked", "invalid"] },
+        "reason_code": {
+          "enum": [
+            "all_hard_gates_passed",
+            "scientific_gate_failed",
+            "evidence_incomplete",
+            "structural_evidence_invalid"
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "componentWeights": {
+      "type": "object",
+      "required": ["position", "orientation", "linear_velocity", "angular_velocity"],
+      "properties": {
+        "position": { "const": 0.25 },
+        "orientation": { "const": 0.25 },
+        "linear_velocity": { "const": 0.25 },
+        "angular_velocity": { "const": 0.25 }
+      },
+      "unevaluatedProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source_commit",
+        "source_tree_sha256",
+        "experiment_spec_sha256",
+        "runtime_lock_sha256"
+      ],
+      "properties": {
+        "source_commit": { "$ref": "#/$defs/gitCommit" },
+        "source_tree_sha256": { "$ref": "#/$defs/sha256" },
+        "experiment_spec_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_lock_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

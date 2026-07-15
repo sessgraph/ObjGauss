@@ -1,0 +1,86 @@
+{
+  "fixture_id": "pr02a-contract-fixtures-v0",
+  "schema_version": "0.3.0",
+  "frozen_contracts": [
+    {
+      "path": "contracts/objgauss/0.1.0/episode.schema.json",
+      "sha256": "b619618706a1bd8da370c465fb36ba8e8edb08ada3406663fc2e2ed2dfa0da9c"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/attempt.schema.json",
+      "sha256": "827380c8ac507040b88852aa18675738cfaf274b72854a09cf88483d174ee4b6"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/episode.schema.json",
+      "sha256": "52e954dd0215764da636fe6ae86c57a99dc1740f51507818ba459fa2c12eb0b8"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/experiment.schema.json",
+      "sha256": "ba8fce920e1face03369ba1c66fe25696c2e1392fdab917e0c44e170436039cd"
+    },
+    {
+      "path": "contracts/objgauss/0.2.0/invariance-report.schema.json",
+      "sha256": "f55b1a8d80ba6f824d13f4bce499577e273f593ab9900ed146d9d54b129ae7aa"
+    }
+  ],
+  "schemas": [
+    {
+      "path": "contracts/objgauss/0.3.0/checkpoint-manifest.schema.json",
+      "sha256": "c1b991af682d00048412875e81480ba2bd55a40c2200652237ccf08a79ed2822"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/common.schema.json",
+      "sha256": "a40d0dc44303db092882af6b47de82a9d19c35a028ffacc33424476afba10fc4"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/dynamics-evaluation-report.schema.json",
+      "sha256": "c4e68ea604a7469cc02bcfd6cf92635594fa46d3ebc0f01d81691aa83e48850b"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/dynamics-experiment.schema.json",
+      "sha256": "64647960592854aae593551d486b6474d689135a5ee5d5e17810a7bdd0cadb67"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/dynamics-prediction.schema.json",
+      "sha256": "34866e6c27f0ba68fc40a1092ee6bf404122d1c67ec832d08817081c1467c7d9"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/training-attempt.schema.json",
+      "sha256": "2d06c74cab109b214c7daf4e4142b0c4936072dd2d6ae2c9fc2110fe3549212a"
+    },
+    {
+      "path": "contracts/objgauss/0.3.0/training-trial.schema.json",
+      "sha256": "bf544789cbb6fdd2ba23462c4d78c0b4b04f84c73113f2c1b3406438a9666559"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "contracts/fixtures/pr02a/checkpoint-manifest.valid.json",
+      "sha256": "be44438c160a565c16603a7c38ceaa944231f7aaeb5fdccf95bdd0813d59372b"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/dynamics-evaluation-report.valid.json",
+      "sha256": "7bf316ac56059b718c0a79501a1896c2cbd2d2efaccc2aefd881a8b0479fba84"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/dynamics-experiment.valid.json",
+      "sha256": "fe9e1cdaef991d18ab59f559e88a93214e6d13e157f67c4231c48fc291e2e160"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/dynamics-prediction.valid.json",
+      "sha256": "29a05d61264fdff3efd70f1633461b521855567581ee54954bb1d86a9857c9d3"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/negative-cases.json",
+      "sha256": "1a8da98f323113b55905e04f59525f33232d5544c1d35fa3161c7b33f48628e1"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/training-attempt.valid.json",
+      "sha256": "dcbc14aa43482adfd44e85b6732f285e16142ecfbf7363c77428c11dd6c65061"
+    },
+    {
+      "path": "contracts/fixtures/pr02a/training-trial.valid.json",
+      "sha256": "8b29c4b83fadace01bc11b2fbaf7ce264e2badc675d7bf7fcc66f0fe865a4315"
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/training-attempt.schema.json",
+  "title": "ObjGauss PR-02 Training Attempt",
+  "description": "Immutable infrastructure/scientific outcome and retry lineage for one training task attempt.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "timing",
+    "outcome",
+    "retry",
+    "resources",
+    "outputs",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "contract_kind": { "const": "objgauss.training_attempt" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "timing": { "$ref": "#/$defs/timing" },
+    "outcome": { "$ref": "#/$defs/outcome" },
+    "retry": { "$ref": "#/$defs/retry" },
+    "resources": { "$ref": "#/$defs/resources" },
+    "outputs": { "$ref": "#/$defs/outputs" },
+    "provenance": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/provenance"
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["experiment_id", "trial_id", "attempt_id", "ordinal", "model_arm", "training_seed", "config_sha256"],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "trial_id": { "$ref": "#/$defs/identifier" },
+        "attempt_id": { "$ref": "#/$defs/identifier" },
+        "ordinal": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "model_arm": { "enum": ["action_free", "action_conditioned"] },
+        "training_seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "config_sha256": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "timing": {
+      "type": "object",
+      "required": ["started_monotonic_s", "finished_monotonic_s", "wall_seconds"],
+      "properties": {
+        "started_monotonic_s": { "type": "number", "minimum": 0 },
+        "finished_monotonic_s": { "type": "number", "minimum": 0 },
+        "wall_seconds": { "type": "number", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["status", "classification", "reason_code", "message"],
+      "properties": {
+        "status": { "enum": ["succeeded", "failed"] },
+        "classification": { "enum": ["none", "infrastructure", "scientific", "validation"] },
+        "reason_code": {
+          "enum": [
+            "none",
+            "process_crash",
+            "io_failure",
+            "transient_oom",
+            "non_finite_output",
+            "not_converged",
+            "schema_invalid",
+            "lineage_invalid",
+            "display_vram_reserve_violated"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 }
+      },
+      "unevaluatedProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "required": ["max_attempts", "eligible", "same_seed", "same_config", "previous_attempt_id"],
+      "properties": {
+        "max_attempts": { "const": 2 },
+        "eligible": { "type": "boolean" },
+        "same_seed": { "const": true },
+        "same_config": { "const": true },
+        "previous_attempt_id": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableIdentifier"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "required": ["gpu_hours", "peak_vram_bytes", "minimum_display_vram_free_bytes", "artifact_bytes"],
+      "properties": {
+        "gpu_hours": { "type": "number", "minimum": 0, "maximum": 24 },
+        "peak_vram_bytes": { "type": "integer", "minimum": 0, "maximum": 12884901888 },
+        "minimum_display_vram_free_bytes": { "type": "integer", "minimum": 1073741824 },
+        "artifact_bytes": { "type": "integer", "minimum": 0, "maximum": 107374182400 }
+      },
+      "unevaluatedProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["training_log", "checkpoint"],
+      "properties": {
+        "training_log": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableArtifact"
+        },
+        "checkpoint": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableArtifact"
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

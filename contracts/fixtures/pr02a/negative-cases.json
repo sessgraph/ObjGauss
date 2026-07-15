@@ -1,0 +1,319 @@
+{
+  "fixture_kind": "objgauss.contract-negative-cases",
+  "version": "0.3.0",
+  "cases": [
+    {
+      "case_id": "latest-version-forbidden",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/schema_version",
+      "value": "latest",
+      "expected_reason_code": "unsupported-contract-version"
+    },
+    {
+      "case_id": "missing-version-forbidden",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "delete",
+      "path": "/schema_version",
+      "expected_reason_code": "unsupported-contract-version"
+    },
+    {
+      "case_id": "wrong-contract-kind-forbidden",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/contract_kind",
+      "value": "objgauss.experiment",
+      "expected_reason_code": "unsupported-contract-kind"
+    },
+    {
+      "case_id": "unknown-field-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/unexpected",
+      "value": true,
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "unsafe-artifact-path-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/training/hyperparameter_grid/uri",
+      "value": "../escape.json",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "non-finite-scale-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set-non-finite",
+      "path": "/endpoint/normalization_scales/position",
+      "value": "NaN",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "split-identity-leakage-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/data_policy/test/object_identity_ids",
+      "value": ["train-object-a"],
+      "expected_reason_code": "split-leakage"
+    },
+    {
+      "case_id": "split-count-mismatch-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/data_policy/train/group_count",
+      "value": 3,
+      "expected_reason_code": "split-count-inconsistent"
+    },
+    {
+      "case_id": "unordered-horizon-rejected",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "set",
+      "path": "/horizon/scoring_times_s/1",
+      "value": 0.2,
+      "expected_reason_code": "horizon-inconsistent"
+    },
+    {
+      "case_id": "pilot-freeze-lineage-required",
+      "base": "dynamics-experiment.valid.json",
+      "operation": "delete",
+      "path": "/data_policy/pilot_freeze",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "failed-trial-cannot-be-selected",
+      "base": "training-trial.valid.json",
+      "operation": "set",
+      "path": "/outcome/status",
+      "value": "failed",
+      "expected_reason_code": "trial-outcome-inconsistent"
+    },
+    {
+      "case_id": "trial-progress-cannot-exceed-config",
+      "base": "training-trial.valid.json",
+      "operation": "set",
+      "path": "/outcome/optimizer_updates_completed",
+      "value": 1001,
+      "expected_reason_code": "trial-progress-exceeds-budget"
+    },
+    {
+      "case_id": "validation-error-cannot-be-negative",
+      "base": "training-trial.valid.json",
+      "operation": "set",
+      "path": "/selection/validation_primary_error/value",
+      "value": -0.01,
+      "expected_reason_code": "trial-metric-negative"
+    },
+    {
+      "case_id": "successful-attempt-needs-none-classification",
+      "base": "training-attempt.valid.json",
+      "operation": "set",
+      "path": "/outcome/classification",
+      "value": "scientific",
+      "expected_reason_code": "training-attempt-outcome-inconsistent"
+    },
+    {
+      "case_id": "retry-needs-previous-attempt",
+      "base": "training-attempt.valid.json",
+      "operation": "set",
+      "path": "/identity/ordinal",
+      "value": 2,
+      "expected_reason_code": "retry-lineage-inconsistent"
+    },
+    {
+      "case_id": "successful-attempt-cannot-be-retry-eligible",
+      "base": "training-attempt.valid.json",
+      "operation": "set",
+      "path": "/retry/eligible",
+      "value": true,
+      "expected_reason_code": "retry-eligibility-inconsistent"
+    },
+    {
+      "case_id": "checkpoint-runtime-lock-must-match",
+      "base": "checkpoint-manifest.valid.json",
+      "operation": "set",
+      "path": "/compatibility/runtime_lock_sha256",
+      "value": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+      "expected_reason_code": "checkpoint-runtime-lineage-inconsistent"
+    },
+    {
+      "case_id": "prediction-cannot-read-gt-future",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/inputs/gt_future_read",
+      "value": true,
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "source-episode-version-must-remain-0.2.0",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/inputs/source_episode/schema_version",
+      "value": "0.3.0",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "source-episode-path-must-be-safe",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/inputs/source_episode/uri",
+      "value": "../../episode.json",
+      "expected_reason_code": "schema-invalid"
+    },
+    {
+      "case_id": "prediction-times-must-match-horizon",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/predictions/1/time_s",
+      "value": 0.4,
+      "expected_reason_code": "prediction-horizon-inconsistent"
+    },
+    {
+      "case_id": "prediction-must-contain-target",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/inputs/target_object_id",
+      "value": "object-missing",
+      "expected_reason_code": "target-object-missing"
+    },
+    {
+      "case_id": "prediction-quaternion-must-be-normalized",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/predictions/0/objects/0/quaternion_WO_wxyz/0",
+      "value": 0.5,
+      "expected_reason_code": "quaternion-not-normalized"
+    },
+    {
+      "case_id": "prediction-quaternion-sign-must-be-canonical",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/predictions/0/objects/0/quaternion_WO_wxyz/0",
+      "value": -1,
+      "expected_reason_code": "quaternion-sign-noncanonical"
+    },
+    {
+      "case_id": "prediction-payload-hash-must-match",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/prediction_payload_sha256",
+      "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected_reason_code": "prediction-payload-checksum-mismatch"
+    },
+    {
+      "case_id": "learned-prediction-needs-checkpoint-lineage",
+      "base": "dynamics-prediction.valid.json",
+      "operation": "set",
+      "path": "/identity/checkpoint_id",
+      "value": { "availability": "missing", "reason": "not_produced" },
+      "expected_reason_code": "prediction-model-lineage-inconsistent"
+    },
+    {
+      "case_id": "evaluation-verdict-reason-must-match",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/verdict/reason_code",
+      "value": "scientific_gate_failed",
+      "expected_reason_code": "verdict-reason-inconsistent"
+    },
+    {
+      "case_id": "all-passing-report-must-be-supported",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/verdict",
+      "value": {
+        "status": "rejected",
+        "reason_code": "scientific_gate_failed"
+      },
+      "expected_reason_code": "verdict-status-inconsistent"
+    },
+    {
+      "case_id": "baseline-matrix-must-be-complete",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/baseline_comparisons/2/baseline",
+      "value": "copy_state",
+      "expected_reason_code": "baseline-matrix-incomplete"
+    },
+    {
+      "case_id": "comparison-interval-must-contain-estimate",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/baseline_comparisons/0/confidence_interval_95/lower",
+      "value": 0.13,
+      "expected_reason_code": "interval-inconsistent"
+    },
+    {
+      "case_id": "comparison-pass-must-follow-ci",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/baseline_comparisons/0/passed",
+      "value": false,
+      "expected_reason_code": "comparison-gate-inconsistent"
+    },
+    {
+      "case_id": "direction-pass-must-follow-signs",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/direction_gates/0/passed",
+      "value": false,
+      "expected_reason_code": "direction-gate-inconsistent"
+    },
+    {
+      "case_id": "shuffle-pass-must-follow-ci",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/action_shuffle/passed",
+      "value": false,
+      "expected_reason_code": "shuffle-gate-inconsistent"
+    },
+    {
+      "case_id": "hard-gate-matrix-must-be-complete",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/hard_gates/13/gate_id",
+      "value": "schema_valid",
+      "expected_reason_code": "hard-gate-matrix-incomplete"
+    },
+    {
+      "case_id": "supported-report-cannot-have-failed-gate",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/hard_gates/0/status",
+      "value": "rejected",
+      "expected_reason_code": "supported-report-has-failed-gates"
+    },
+    {
+      "case_id": "scientific-hard-gate-must-match-statistic",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/hard_gates/8/status",
+      "value": "rejected",
+      "expected_reason_code": "hard-gate-status-inconsistent"
+    },
+    {
+      "case_id": "retry-fraction-must-reconcile",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/retry_audit/extra_attempt_fraction",
+      "value": 0.04,
+      "expected_reason_code": "retry-audit-inconsistent"
+    },
+    {
+      "case_id": "gpu-hours-must-reconcile",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/resources/gpu_hours_total",
+      "value": 2.1,
+      "expected_reason_code": "resource-accounting-inconsistent"
+    },
+    {
+      "case_id": "display-vram-reserve-is-hard",
+      "base": "dynamics-evaluation-report.valid.json",
+      "operation": "set",
+      "path": "/resources/minimum_display_vram_free_bytes",
+      "value": 1073741823,
+      "expected_reason_code": "schema-invalid"
+    }
+  ]
+}

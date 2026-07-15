@@ -1,0 +1,147 @@
+{
+  "schema_version": "0.3.0",
+  "contract_kind": "objgauss.dynamics_experiment",
+  "identity": {
+    "experiment_id": "pr02a-fixture-experiment",
+    "fixture_id": "pr02a-contract-fixtures-v0",
+    "preregistration_sha256": "4f4a9410ffcdf895c4adb880659e9b5c0dd1f23a30790684340b3eaacb045398"
+  },
+  "contract_versions": {
+    "source_episode": "0.2.0",
+    "dynamics_records": "0.3.0"
+  },
+  "source": {
+    "simulator": "mani-skill==3.0.1",
+    "sapien": "sapien==3.0.3",
+    "runtime_lock_sha256": "18ac3e7343f016890c510e93f935261169d9e3f565436f47b1c6bf10f2163e71",
+    "source_gate_report_sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+    "source_gate_status": "supported"
+  },
+  "data_policy": {
+    "source_kind": "maniskill-programmatic-cpu-primitive",
+    "pr01_groups_excluded": true,
+    "new_cohort_required": true,
+    "split_unit": "sibling_group",
+    "isolation_keys": ["object_identity_id", "layout_id", "group_id"],
+    "pilot_freeze": {
+      "report_sha256": "b493d48364afe44d11c0165cf470a4164d1e2609911ef998be868d46ade3de4e",
+      "excluded_from_training": true,
+      "excluded_from_final_statistics": true,
+      "freezes": [
+        "horizon_and_scoring_times",
+        "normalization_scales",
+        "delta",
+        "delta_shuffle",
+        "split_group_counts",
+        "training_seeds",
+        "training_configuration"
+      ]
+    },
+    "calibration": {
+      "object_identity_ids": ["pilot-object-a"],
+      "layout_ids": ["pilot-layout-a"],
+      "group_ids": ["pilot-group-1"],
+      "group_count": 1
+    },
+    "train": {
+      "object_identity_ids": ["train-object-a", "train-object-b"],
+      "layout_ids": ["train-layout-a"],
+      "group_ids": ["train-group-1", "train-group-2"],
+      "group_count": 2
+    },
+    "validation": {
+      "object_identity_ids": ["validation-object-a"],
+      "layout_ids": ["validation-layout-a"],
+      "group_ids": ["validation-group-1"],
+      "group_count": 1
+    },
+    "test": {
+      "object_identity_ids": ["test-object-a"],
+      "layout_ids": ["test-layout-a"],
+      "group_ids": ["test-group-1"],
+      "group_count": 1
+    },
+    "final_access": {
+      "trainer_loader_rejects_test": true,
+      "inference_reads_gt_future": false,
+      "evaluator_only_reads_gt_future": true,
+      "max_formal_runs": 1
+    }
+  },
+  "endpoint": {
+    "name": "target-object-multistep-effect-vs-hold-objectstate-error",
+    "target_scope": "intervention.target_object_id",
+    "components": [
+      "position",
+      "orientation_symmetry_corrected",
+      "linear_velocity",
+      "angular_velocity"
+    ],
+    "component_weights": {
+      "position": 0.25,
+      "orientation": 0.25,
+      "linear_velocity": 0.25,
+      "angular_velocity": 0.25
+    },
+    "normalization": "max-pilot-robust-scale-evaluator-noise-floor",
+    "normalization_scales": {
+      "position": 0.01,
+      "orientation": 0.02,
+      "linear_velocity": 0.1,
+      "angular_velocity": 0.2
+    },
+    "aggregation": "group-first-paired-hierarchical-bootstrap",
+    "confidence_level": 0.95,
+    "baselines": ["copy_state", "constant_velocity", "action_free"],
+    "delta": 0.05,
+    "delta_shuffle": 0.03
+  },
+  "horizon": {
+    "unit": "physical_seconds",
+    "duration_s": 1,
+    "scoring_times_s": [0.25, 0.5, 1],
+    "covers_action": true,
+    "covers_settling": true
+  },
+  "training": {
+    "model_family": "minimal-object-gnn",
+    "message_passing_rounds": 1,
+    "prediction_action": "commanded_action",
+    "executed_action_is_feature": false,
+    "loss": "normalized-open-loop-branch-rollout",
+    "teacher_forcing": "initial-state-only",
+    "arms": ["copy_state", "constant_velocity", "action_free", "action_conditioned"],
+    "training_seeds": [101, 102],
+    "checkpoint_selection": "minimum-validation-primary-error-per-seed",
+    "hyperparameter_grid": {
+      "uri": "generated/pr02b/freeze/hyperparameter-grid.json",
+      "media_type": "application/json",
+      "sha256": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+      "byte_size": 512
+    }
+  },
+  "budgets": {
+    "gpu_hours_total_max": 24,
+    "gpu_hours_pilot_hpo_max": 8,
+    "gpu_hours_formal_max": 16,
+    "training_peak_vram_bytes_max": 12884901888,
+    "display_vram_reserve_bytes_min": 1073741824,
+    "cohort_cpu_wall_hours_max": 8,
+    "artifact_bytes_max": 107374182400
+  },
+  "retry_policy": {
+    "max_attempts_per_task": 2,
+    "max_extra_attempt_fraction": 0.05,
+    "same_seed_config": true,
+    "eligible_failures": ["process_crash", "io_failure", "transient_oom"],
+    "scientific_retry_allowed": false
+  },
+  "claim_boundary": {
+    "hypothesis": "commanded-action-conditioned-objectstate-dynamics-beats-all-preregistered-baselines",
+    "excluded_claims": [
+      "gaussian-dynamics-value",
+      "external-data-generalization",
+      "robot-control"
+    ]
+  }
+}

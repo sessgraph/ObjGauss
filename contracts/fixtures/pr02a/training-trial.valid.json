@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.3.0",
+  "contract_kind": "objgauss.training_trial",
+  "identity": {
+    "experiment_id": "pr02a-fixture-experiment",
+    "trial_id": "trial-action-conditioned-config-a-seed-101",
+    "model_arm": "action_conditioned",
+    "config_id": "config-a",
+    "training_seed": 101
+  },
+  "configuration": {
+    "config_sha256": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6",
+    "hyperparameter_grid_sha256": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+    "optimizer_updates_max": 1000,
+    "epochs_max": 20
+  },
+  "outcome": {
+    "status": "completed",
+    "reason_code": "completed",
+    "optimizer_updates_completed": 800,
+    "epochs_completed": 16
+  },
+  "selection": {
+    "selected": true,
+    "split": "validation",
+    "metric": "target-object-multistep-effect-vs-hold-objectstate-error",
+    "validation_primary_error": {
+      "availability": "present",
+      "value": 0.42
+    },
+    "checkpoint_id": {
+      "availability": "present",
+      "value": "checkpoint-action-conditioned-config-a-seed-101"
+    }
+  },
+  "attempt_ids": ["attempt-action-conditioned-config-a-seed-101-1"],
+  "resources": {
+    "gpu_hours": 0.25,
+    "peak_vram_bytes": 2147483648,
+    "minimum_display_vram_free_bytes": 4294967296,
+    "artifact_bytes": 1048576
+  },
+  "provenance": {
+    "source_commit": "91bc05e9f3648a44e7e8d161420a26d1c40a5d6f",
+    "source_tree_sha256": "b493d48364afe44d11c0165cf470a4164d1e2609911ef998be868d46ade3de4e",
+    "experiment_spec_sha256": "4f4a9410ffcdf895c4adb880659e9b5c0dd1f23a30790684340b3eaacb045398",
+    "runtime_lock_sha256": "18ac3e7343f016890c510e93f935261169d9e3f565436f47b1c6bf10f2163e71"
+  }
+}

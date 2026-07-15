@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/checkpoint-manifest.schema.json",
+  "title": "ObjGauss PR-02 Checkpoint Manifest",
+  "description": "Immutable validation-selected checkpoint identity, compatibility, payload checksum, and training lineage.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "selection",
+    "configuration",
+    "payload",
+    "compatibility",
+    "final_evaluation_eligible",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "contract_kind": { "const": "objgauss.checkpoint_manifest" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "configuration": { "$ref": "#/$defs/configuration" },
+    "payload": { "$ref": "#/$defs/checkpointArtifact" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "final_evaluation_eligible": { "const": true },
+    "provenance": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/provenance"
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+    },
+    "sha256": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["experiment_id", "trial_id", "checkpoint_id", "model_arm", "training_seed"],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "trial_id": { "$ref": "#/$defs/identifier" },
+        "checkpoint_id": { "$ref": "#/$defs/identifier" },
+        "model_arm": { "enum": ["action_free", "action_conditioned"] },
+        "training_seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      },
+      "unevaluatedProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": ["split", "metric", "validation_primary_error", "epoch", "optimizer_update"],
+      "properties": {
+        "split": { "const": "validation" },
+        "metric": { "const": "target-object-multistep-effect-vs-hold-objectstate-error" },
+        "validation_primary_error": { "type": "number", "minimum": 0 },
+        "epoch": { "type": "integer", "minimum": 1 },
+        "optimizer_update": { "type": "integer", "minimum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "configuration": {
+      "type": "object",
+      "required": ["config_id", "config_sha256", "architecture_sha256", "parameter_count", "optimizer_state_included"],
+      "properties": {
+        "config_id": { "$ref": "#/$defs/identifier" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "architecture_sha256": { "$ref": "#/$defs/sha256" },
+        "parameter_count": { "type": "integer", "minimum": 1 },
+        "optimizer_state_included": { "const": false }
+      },
+      "unevaluatedProperties": false
+    },
+    "checkpointArtifact": {
+      "type": "object",
+      "required": ["uri", "media_type", "sha256", "byte_size"],
+      "properties": {
+        "uri": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/artifactPath"
+        },
+        "media_type": { "const": "application/vnd.objgauss.pytorch-state-dict" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byte_size": { "type": "integer", "minimum": 1, "maximum": 107374182400 }
+      },
+      "unevaluatedProperties": false
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["python_version", "torch_version", "runtime_lock_sha256", "device_kind"],
+      "properties": {
+        "python_version": { "const": "3.10.20" },
+        "torch_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "device_kind": { "enum": ["cpu", "cuda"] }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

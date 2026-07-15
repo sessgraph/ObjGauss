@@ -28,3 +28,12 @@ acceptance delivery 六项远端 Actions 全部成功。任何后续 `main` HEAD
 PR-01 状态自动重开。
 模型、训练、Gaussian dynamics、外部数据、
 RGB/GPU renderer 和机器人控制均未实现。
+
+PR-02 的主要预注册决策已经完成：唯一 primary endpoint 是 held-out sibling groups 上 target
+object 的多步 `effect-vs-hold` ObjectState error；使用全新隔离 ManiSkill cohort、最小 Object
+GNN、独立 `learning/`/纯 PyTorch 栈、全门联合 verdict 和 `02A`–`02F` 串行切片。硬资源上限为
+24 GPU-hours、12 GiB 训练峰值且始终为桌面显示保留至少 1 GiB 实际可用显存、8 CPU
+wall-hours 和 100 GiB ignored artifacts。PR-02A 已在本地建立 7 个 `0.3.0` schema 文件、6 种
+精确分派记录、6 个正向 fixtures 与 39 个负例；旧 5 个 contract 文件哈希保持冻结，machine
+report `3b1e64a0…acccca3f` 和 `npm run check` 均为 `supported`。该实现已提交但尚无远端 CI
+证据；仍没有模型代码、pilot、cohort 或训练证据。下一门 PR-02B 必须另行授权。

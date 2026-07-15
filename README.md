@@ -222,11 +222,30 @@ python3 -m http.server 8000 --bind 127.0.0.1
 GitHub Actions 全部成功，PR-01F 与完整 PR-01 远端门已关闭；任何后续 `main` HEAD 若未保持
 这些门成功，状态自动重开。
 
+## 验证 PR-02A Contract 0.3.0
+
+`0.1.0` 与 `0.2.0` 保持字节冻结；`0.3.0` 使用 dynamics experiment、training trial/attempt、
+checkpoint manifest、raw dynamics prediction 和 independent evaluation report 六种可分派记录，
+并通过 shared schema 复用严格 identifier、artifact、availability、provenance 与 verdict 定义：
+
+```bash
+npm run contract:pr02a
+node --test tests/pr02a-contracts.test.mjs
+npm run check
+```
+
+当前本地 machine report 为 `supported`，SHA-256 为
+`3b1e64a02120da2ca5ef5616af08f8ee068498139dfdb54b4e471045acccca3f`：5 个旧 contract 文件哈希
+保持冻结，7 个 `0.3.0` schema 文件、6 个正向 fixtures 和 39 个负例全部通过。报告位于 ignored
+`generated/pr02a/contract-report.json`，可由上述命令重建。本结果只支持 PR-02A contract 的
+表达力、精确版本分派和 fail-closed 语义；不表示 pilot、cohort、trainer、checkpoint、模型指标、
+Gaussian dynamics 或机器人控制已经实现。
+
 ## 项目事实源
 
 - [`docs/PRD.md`](docs/PRD.md)：问题、用户、概念数据语义、声明门和开放决策。
 - [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)：按可证伪假设拆分的 `PR-00`–`PR-11` 路径。
-- [`docs/state/pr-queue.md`](docs/state/pr-queue.md)：PR-01A–F 等切片的当前动态状态。
+- [`docs/state/pr-queue.md`](docs/state/pr-queue.md)：PR-01A–F、PR-02A–F 等切片的当前动态状态。
 - [`REFERENCES.md`](REFERENCES.md)：固定预览、候选数据、归档资源和许可状态。
 - [`AGENTS.md`](AGENTS.md)：稳定协作、授权、安全和验收规则。
 

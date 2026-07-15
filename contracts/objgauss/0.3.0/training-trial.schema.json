@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/training-trial.schema.json",
+  "title": "ObjGauss PR-02 Training Trial",
+  "description": "Immutable summary of one preregistered learned-arm configuration and training seed.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "configuration",
+    "outcome",
+    "selection",
+    "attempt_ids",
+    "resources",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "contract_kind": { "const": "objgauss.training_trial" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "configuration": { "$ref": "#/$defs/configuration" },
+    "outcome": { "$ref": "#/$defs/outcome" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "attempt_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+      }
+    },
+    "resources": { "$ref": "#/$defs/resources" },
+    "provenance": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/provenance"
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+    },
+    "sha256": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["experiment_id", "trial_id", "model_arm", "config_id", "training_seed"],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "trial_id": { "$ref": "#/$defs/identifier" },
+        "model_arm": { "enum": ["action_free", "action_conditioned"] },
+        "config_id": { "$ref": "#/$defs/identifier" },
+        "training_seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      },
+      "unevaluatedProperties": false
+    },
+    "configuration": {
+      "type": "object",
+      "required": ["config_sha256", "hyperparameter_grid_sha256", "optimizer_updates_max", "epochs_max"],
+      "properties": {
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "hyperparameter_grid_sha256": { "$ref": "#/$defs/sha256" },
+        "optimizer_updates_max": { "type": "integer", "minimum": 1 },
+        "epochs_max": { "type": "integer", "minimum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["status", "reason_code", "optimizer_updates_completed", "epochs_completed"],
+      "properties": {
+        "status": { "enum": ["completed", "failed"] },
+        "reason_code": {
+          "enum": [
+            "completed",
+            "process_crash",
+            "io_failure",
+            "transient_oom",
+            "non_finite_output",
+            "not_converged",
+            "schema_invalid",
+            "lineage_invalid"
+          ]
+        },
+        "optimizer_updates_completed": { "type": "integer", "minimum": 0 },
+        "epochs_completed": { "type": "integer", "minimum": 0 }
+      },
+      "unevaluatedProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": ["selected", "split", "metric", "validation_primary_error", "checkpoint_id"],
+      "properties": {
+        "selected": { "type": "boolean" },
+        "split": { "const": "validation" },
+        "metric": { "const": "target-object-multistep-effect-vs-hold-objectstate-error" },
+        "validation_primary_error": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableNumber"
+        },
+        "checkpoint_id": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableIdentifier"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "required": ["gpu_hours", "peak_vram_bytes", "minimum_display_vram_free_bytes", "artifact_bytes"],
+      "properties": {
+        "gpu_hours": { "type": "number", "minimum": 0, "maximum": 24 },
+        "peak_vram_bytes": { "type": "integer", "minimum": 0, "maximum": 12884901888 },
+        "minimum_display_vram_free_bytes": { "type": "integer", "minimum": 1073741824 },
+        "artifact_bytes": { "type": "integer", "minimum": 0, "maximum": 107374182400 }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

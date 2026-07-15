@@ -1,0 +1,119 @@
+{
+  "schema_version": "0.3.0",
+  "contract_kind": "objgauss.dynamics_prediction",
+  "identity": {
+    "experiment_id": "pr02a-fixture-experiment",
+    "prediction_id": "prediction-test-group-1-push-pos-x-action-conditioned-seed-101",
+    "group_id": "test-group-1",
+    "branch_id": "push-pos-x",
+    "split": "fixture",
+    "model_arm": "action_conditioned",
+    "trial_id": {
+      "availability": "present",
+      "value": "trial-action-conditioned-config-a-seed-101"
+    },
+    "checkpoint_id": {
+      "availability": "present",
+      "value": "checkpoint-action-conditioned-config-a-seed-101"
+    },
+    "training_seed": {
+      "availability": "present",
+      "value": 101
+    }
+  },
+  "inputs": {
+    "source_episode": {
+      "uri": "generated/pr02/cohort/test-group-1/push-pos-x/episode.json",
+      "media_type": "application/json",
+      "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+      "schema_version": "0.2.0",
+      "lineage_sha256": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6"
+    },
+    "initial_objectstate_sha256": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+    "commanded_action_sha256": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6",
+    "target_object_id": "object-a",
+    "visible_fields": [
+      "initial_objectstate",
+      "commanded_action_schedule",
+      "non_future_metadata"
+    ],
+    "commanded_action_present": true,
+    "executed_action_is_feature": false,
+    "gt_future_read": false
+  },
+  "horizon": {
+    "unit": "physical_seconds",
+    "duration_s": 1,
+    "scoring_times_s": [0.25, 0.5, 1]
+  },
+  "predictions": [
+    {
+      "time_s": 0.25,
+      "objects": [
+        {
+          "object_id": "object-a",
+          "position_W_m": [0.01, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0.04, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        },
+        {
+          "object_id": "object-b",
+          "position_W_m": [0.3, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        }
+      ]
+    },
+    {
+      "time_s": 0.5,
+      "objects": [
+        {
+          "object_id": "object-a",
+          "position_W_m": [0.018, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0.025, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        },
+        {
+          "object_id": "object-b",
+          "position_W_m": [0.3, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        }
+      ]
+    },
+    {
+      "time_s": 1,
+      "objects": [
+        {
+          "object_id": "object-a",
+          "position_W_m": [0.022, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        },
+        {
+          "object_id": "object-b",
+          "position_W_m": [0.3, 0, 0.1],
+          "quaternion_WO_wxyz": [1, 0, 0, 0],
+          "linear_velocity_W_m_s": [0, 0, 0],
+          "angular_velocity_W_rad_s": [0, 0, 0]
+        }
+      ]
+    }
+  ],
+  "prediction_payload_sha256": "fc7eda6c82ea3c21404bad0a4bf5c34eee371166e5ba36ecae4a31305c9d45c0",
+  "publication": {
+    "atomic_publish": true,
+    "immutable_after_publish": true
+  },
+  "provenance": {
+    "source_commit": "91bc05e9f3648a44e7e8d161420a26d1c40a5d6f",
+    "source_tree_sha256": "b493d48364afe44d11c0165cf470a4164d1e2609911ef998be868d46ade3de4e",
+    "experiment_spec_sha256": "4f4a9410ffcdf895c4adb880659e9b5c0dd1f23a30790684340b3eaacb045398",
+    "runtime_lock_sha256": "18ac3e7343f016890c510e93f935261169d9e3f565436f47b1c6bf10f2163e71"
+  }
+}

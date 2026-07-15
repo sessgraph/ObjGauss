@@ -465,8 +465,9 @@ Gaussian 的增量价值。`PR-00` 的许可证、contract、坐标与验证栈�
    重新取得 Owner 授权并记录许可审查。
 3. `decision`：`PR-00` 使用 JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild 和
    `node:test`，不引入服务端框架；GitHub Actions 在 PR 和 `main` 上以 `npm run check` 执行
-   Node 24、`npm ci`、contract audit、测试与 Web build。未来 Python/训练栈、长期 Viewer 和
-   数据落盘格式仍待确认。
+   Node 24、`npm ci`、contract audit、测试与 Web build。PR-02 已确认使用隔离 `learning/`、
+   CPython 3.10.20、`uv` 和精确锁定的纯 PyTorch，以及纯 Web/无 notebook 的 Delivery；
+   PR-03 之后的表示/训练栈和数据落盘格式仍待确认。
 4. `decision`：`PR-00` 以 JSON Schema Draft 2020-12 作为唯一机器 contract 源，并使用
    Robotics/OpenCV 坐标约定：`T_AB · p_B = p_A`，列向量左乘；World 为右手系、`+Z`
    向上、meter；Camera 为 `+X` 右、`+Y` 下、`+Z` 前；`T_WC` 表示 Camera → World，投影使用
@@ -476,8 +477,15 @@ Gaussian 的增量价值。`PR-00` 的许可证、contract、坐标与验证栈�
    producer 定义且 synthetic 原点为刚体质心；symmetry 按第 6.3 节显式表达。缺失值使用
    第 6.1 节的 tagged union。Schema 从 `0.1.0`
    开始使用严格 SemVer、精确版本匹配、未知字段拒绝和显式可追溯迁移。
-5. 许可审核标准、磁盘/下载预算、算力与可接受的最长验收时间。
-6. 每个 PR 的正式指标、阈值、统计检验、seed 数和资源预算。
+   `confirmed_fact`：PR-02A 已在不修改 `0.1.0`/`0.2.0` 的前提下建立 `0.3.0` 六种 dynamics
+   evidence 记录及精确分派；本地 contract 门为 `supported`，不代表 pilot 或模型能力。
+5. PR-03 之后的许可审核标准、磁盘/下载预算、算力与可接受的最长验收时间。
+6. `decision`：PR-02 使用 held-out sibling groups 上 target object 的多步 `effect-vs-hold`
+   ObjectState error 作为唯一 primary endpoint，采用 group-first paired hierarchical bootstrap
+   与全门联合 verdict；训练/评估硬上限为 24 GPU-hours、12 GiB 训练峰值并为桌面显示保留
+   1 GiB 实际可用显存、8 CPU wall-hours 和 100 GiB ignored artifacts。具体 horizon、scales、
+   `δ`、`δ_shuffle`、seed/group 数由隔离 pilot 在 final 前冻结。PR-03 之后各 PR 的正式指标、
+   统计检验和预算仍待确认。
 7. 目标机器人、动作空间、控制频率、延迟预算和安全规范。
 
 Gaussian 在动力学中的角色不再要求 Owner 预先选择，由 `PR-04` 的预注册实验裁决。

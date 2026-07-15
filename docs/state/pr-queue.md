@@ -14,6 +14,12 @@
 | PR-01C Writer | `committed_remote_supported` | 验收 SHA `234ba00`；22 Python tests；同一 clean source 下 canonical/reverse evidence 一致；远端 golden group 成功 | 保持原子/幂等与 attempt 分账 |
 | PR-01D Audit | `committed_remote_supported` | 验收 SHA `234ba00`；14 hard gates；11 mutations；固定四态/退出码；远端 audit 成功 | evaluator 继续独立 |
 | PR-01E Cohort | `committed_remote_supported` | 验收 SHA `234ba00`；48 groups / 240 episodes；24/12/12；0 failed/extra；远端 frozen cohort 成功 | 冻结 spec、split 与预算 |
-| PR-01F Delivery | `committed_remote_supported` | 验收 SHA `234ba00`；clean `accept-pr01` supported；1210 checksum entries；远端 delivery 成功 | 进入 PR-02 前不扩大声明 |
+| PR-01F Delivery | `committed_remote_supported` | 验收 SHA `234ba00`；clean `accept-pr01` supported；1210 checksum entries；远端 delivery 成功 | 保持回归门，不向 PR-02 外推声明 |
+| PR-02A Contract | `committed_local_supported` | 7 schemas；6 records/positive fixtures；39 negatives；旧 5 contract hashes 冻结；report `3b1e64a0…acccca3f`；`npm run check` 通过 | 远端未运行，不扩大为数据/模型证据 |
+| PR-02B Pilot/Data Freeze | `planned_pending_authorization` | 方法、数据隔离与硬预算已确认；具体数值尚未运行 | Owner 另行授权后运行隔离 pilot |
+| PR-02C Trainer/Baselines | `planned_blocked_by_pr02b` | `learning/`、纯 PyTorch、模型/基线/训练规则已确认；尚无 package/lock | PR-02B freeze `supported` 后另行授权实现 |
+| PR-02D Independent Audit | `planned_blocked_by_pr02c` | evaluator 独立性与 hard gates 已预注册；尚无实现 | PR-02C 通过后实现 mutation/audit 门 |
+| PR-02E Formal Experiment | `planned_blocked_by_pr02d` | final 隔离、统计与 verdict 语义已预注册；尚未运行 | PR-02D `supported` 后一次性运行 frozen experiment |
+| PR-02F Delivery/CI | `planned_blocked_by_pr02e` | Web/CI 声明边界已确认；尚无 Delivery | PR-02E 产生有效 verdict 后构建验收投影 |
 
 状态只描述当前仓库与已运行证据；代码合并不自动把研究假设变为 `supported`。

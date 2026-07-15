@@ -1,8 +1,9 @@
 # ObjGauss 假设驱动实施路径
 
 > 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；代码承载验收 SHA `234ba00` 的 clean 一键验收
-> 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭
-> 版本：0.14
+> 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭；PR-02A 已本地实现、通过项目门并
+> 提交，但尚未取得远端 CI 证据
+> 版本：0.16
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -11,6 +12,75 @@
 > - `decision`：实现 PR 按“一个 PR 只引入一个可证伪假设”拆分，不按数据集拆分。
 > - `decision`：`PR-04` 是 Gaussian 是否进入 dynamics 核心的生死门。
 > - `decision`：首个验收目标是面向研究评审的 Demo A；必须接受 `PR-04` 的支持或否定结论。
+> - `decision`：`PR-02` 的唯一 primary endpoint 是 held-out sibling groups 上 target object 的
+>   多步 `effect-vs-hold` ObjectState 误差；一步预测和非目标对象只作 secondary metrics。
+> - `decision`：`PR-02` primary error 覆盖位置、按对象对称性校正的朝向、线速度和角速度；
+>   每项除以隔离 pilot 的 robust scale 与 evaluator noise floor 的较大者，归一化后各占 25%。
+> - `decision`：`PR-02` rollout horizon 按物理时间覆盖 push 执行与固定 post-action settling；
+>   具体 horizon 和评分时刻由与 final test 隔离的 pilot 预先冻结，`PR-04` 复用同一时间协议。
+> - `decision`：`PR-02` 必须分别胜过 copy-state、constant-velocity 和 action-free；每项使用
+>   group-first paired hierarchical bootstrap，误差降幅的 95% 置信区间下界都必须超过隔离
+>   pilot 预先冻结的最小实际增益 `δ`。
+> - `decision`：`PR-02` action-shuffle 负控只在同一 split 及匹配的对象、场景和动作支持分层
+>   内确定性重排，保持动作边际分布但打断 state-action 配对；primary error 增幅的 paired
+>   bootstrap 95% 置信区间下界必须超过预注册的 `δ_shuffle`。
+> - `decision`：`PR-02` 使用已批准的 ManiSkill primitive source 生成全新 cohort，并与 PR-01
+>   隔离 seeds、layouts、object identities 和 lineage；PR-01 的 48 groups 只作 contract/runtime
+>   回归证据，不进入 PR-02 训练、调参、pilot 或 final 统计。
+> - `decision`：`PR-02` 先用与正式数据完全隔离的 calibration/power pilot 估计 evaluator
+>   noise、跨 seed 波动和资源成本，据此冻结 train/validation/final group 数、硬预算与技术
+>   重试规则；正式 cohort 一次性生成，不得看结果后扩容。
+> - `decision`：`PR-02` 使用独立 `learning/` Python package、CPython `3.10.20`、`uv` 与精确
+>   锁定的纯 PyTorch，不引入 PyG、Lightning 或 Hydra；`sim/` 只生成不可变 evidence，训练
+>   输出进入 ignored `generated/pr02/`。
+> - `decision`：`PR-02` 的唯一学习模型家族是最小 Object GNN：共享 object encoder、一次
+>   pairwise message passing、只向 target object 注入 action、共享 update head，并以
+>   autoregressive residual rollout 预测状态；不得并行筛选多个模型家族后挑赢家。
+> - `decision`：`PR-02` prediction-time feature 只使用 commanded action；executed action 仅作
+>   事后校准和 secondary analysis，不得进入模型输入。Commanded action 缺失时样本为
+>   `blocked`，不得以零值或 hold 冒充。
+> - `decision`：`PR-02` action-free baseline 必须单独训练并与 action-conditioned 模型共享
+>   完全相同的 GNN backbone、参数量、training seeds、optimizer updates 和调参预算，只把
+>   commanded action 替换为固定 mask token；禁止用推理时置零冒充 action-free predictor。
+> - `decision`：`PR-02` 两个学习模型使用相同的多步 open-loop branch rollout loss，只在初始
+>   `S_t` teacher-force，之后自回归；loss 使用 primary scalar 相同的四分量归一化，但不直接
+>   优化 `effect-vs-hold`，该 endpoint 由独立 evaluator 从 raw predictions 与 GT 重算。
+> - `decision`：`PR-02` training seed 数量由 power pilot 冻结；每个 seed 只用 validation
+>   primary error 选择 checkpoint，全部预注册 seeds 都进入 final，并在保持 group pairing 后
+>   纳入 seed 层级聚合；禁止挑选最佳 seed。
+> - `decision`：`PR-02` 两个学习模型使用相同的预注册小型 hyperparameter grid、trial seeds
+>   和试验次数，各自只按 validation primary error 选配置；全部 trials 都报告，冻结配置的
+>   final test 只运行一次，禁止自适应扩大搜索。
+> - `decision`：`PR-02` 硬资源上限为总计 24 GPU-hours（calibration/power pilot 与 HPO 合计
+>   不超过 8，正式训练不超过 16）、峰值显存 12 GiB、cohort 生成 8 CPU wall-hours、ignored
+>   产物 100 GiB；若预算内功效不足则 `blocked`，不得降低统计门槛或事后追加预算。
+> - `decision`：PR-02 的 GPU preflight 与运行监控必须始终为桌面显示保留至少 1 GiB 实际可用
+>   显存；12 GiB 训练进程峰值上限继续生效。其他进程占用导致余量不足时降低 batch size 或
+>   `blocked`，不得抢占显示保留。
+> - `decision`：`PR-02` 只有进程崩溃、I/O、瞬时 OOM 等技术失败可按完全相同 seed/config
+>   重试一次；NaN、不收敛和指标失败不得重试。全部额外 attempts 不超过正式任务数的 5%，
+>   超出时正式结果为 `invalid`，所有尝试必须保留在 ledger。
+> - `decision`：PR-02 新建 `0.3.0` machine contract family，承载冻结实验规格、trial/attempt、
+>   checkpoint manifest、raw prediction 和独立 evaluation report；`0.1.0`/`0.2.0` 字节冻结，
+>   原始 simulator episodes 继续按 `0.2.0` 引用，不存在静默迁移。
+> - `decision`：`PR-02` 串行拆为 `02A Contract`、`02B Pilot/Data Freeze`、`02C
+>   Trainer/Baselines`、`02D Independent Audit`、`02E Formal Experiment` 与 `02F Delivery/CI`；
+>   每片只有一个可验收目标，前置 gate 未通过时后续不得开始。
+> - `decision`：`PR-02` 采用全门联合判定；三个 baseline 置信区间、正负方向、action-shuffle、
+>   split/leakage、独立 audit、资源和 retry gates 必须全部通过才 `supported`，不得用加权总分
+>   抵消失败。科学门失败为 `rejected`，证据/功效不足为 `blocked`，协议损坏为 `invalid`。
+> - `decision`：`PR-02` final split 使用代码级隔离；trainer/HPO loader 必须拒绝 final，正式
+>   inference 只读取初始状态和 commanded actions 并原子发布 raw predictions，GT future 只由
+>   独立 evaluator 读取。配置/checkpoints 冻结后 final 只按预注册 attempt 规则运行。
+> - `decision`：PR-02 远端 CI 在无 GPU runner 时只运行 `0.3.0` contract、CPU tiny-fixture
+>   trainer smoke、独立 evaluator/mutations，并验证正式报告 schema/checksum/lineage；正式 GPU
+>   实验在本机按冻结规格运行，CI 不得声称重跑或支持其科学结论。
+> - `decision`：`PR-02F` 只提供 Web、无 notebook；页面只消费已审计 artifacts，展示 action、
+>   GT 与四个 arms 的多步轨迹、`effect-vs-hold` residual、置信区间和失败 groups。Machine
+>   report 是事实源，浏览器不运行 simulator 或 trainer。
+> - `confirmed_fact`：PR-02A 已建立 7 个 `0.3.0` schema 文件和 6 种精确分派记录；5 个旧
+>   contract 哈希、6 个正向 fixtures 与 39 个负例均通过，本地 machine report 为 `supported`，
+>   SHA-256 为 `3b1e64a0…acccca3f`。这不支持 pilot、数据、模型或指标声明。
 > - `decision`：`PR-04` 的唯一 primary endpoint 是 held-out sibling groups 上的多步
 >   `effect-vs-hold` ObjectState 预测误差。
 > - `decision`：该 endpoint 使用 group-first paired aggregation；每个 sibling group 等权，
@@ -451,20 +521,154 @@ constant-velocity 和 action-free predictor 更准确地预测干预效果。
 **输入输出**
 
 ```text
-(S_t, a_t) -> predicted S_(t+1)
+(S_t, a_t:t+H) -> predicted S_(t+1:t+H)
 ```
 
-候选模型可以是最小 Object GNN，但模型家族由后续模型/训练 ADR 与本 PR 预注册规格决定，
-不因附件中的建议路径或 Stage-0 ADR-001 自动获批。
+**训练与代码边界**
+
+模型源码使用独立 `learning/` Python package，固定 CPython `3.10.20`、`uv` 和精确 lock 的纯
+PyTorch，不引入 PyG、Lightning 或 Hydra。`learning/` 消费冻结的 contract artifacts，不导入
+ManiSkill/SAPIEN；`sim/` 只负责生成不可变 evidence，不承载 trainer 或模型。训练日志、模型
+输出和 checkpoint 只写入 ignored `generated/pr02/`，不得进入 Git。具体 PyTorch wheel/version、
+模型家族和训练命令仍须在实现前由 PR-02 ADR 与 clean GPU probe 固定；本计划不授权预建目录、
+安装依赖或开始训练。
+
+**机器 contract**
+
+PR-02A 已建立 `contracts/objgauss/0.3.0/`，以严格、精确版本分派的 schema 承载冻结 experiment
+spec、trial/attempt ledger、checkpoint manifest、raw prediction 和独立 evaluation report。
+`0.1.0` 与 `0.2.0` 保持字节冻结；PR-02 不复制或扩展原始 episode schema，而是通过校验和、
+URI、`schema_version` 和 lineage 引用 `0.2.0` simulator episodes。不存在隐式
+`0.2.0 -> 0.3.0` 迁移，schema、正负 fixtures 和 version dispatch 必须先于数据生成与训练通过。
+当前本地 audit 已以 5 个冻结旧 contract、7 个新 schema 文件、6 个正向 fixtures 和 39 个负例
+得到 `supported`；报告 SHA-256 为 `3b1e64a0…acccca3f`。该状态已提交，但没有远端 CI 证据。
+长期 contract 取舍见 [`ADR-004`](adr/0004-pr02-dynamics-evidence-contract.md)。
+
+**模型家族**
+
+唯一候选是最小 Object GNN：所有对象共享 encoder，对对象对执行一次共享 pairwise message
+passing，只向 `Intervention.target_id` 对应对象注入 commanded action，随后使用共享 update
+head 预测下一时刻 ObjectState residual，并将预测状态自回归用于多步 rollout。Executed action
+只用于事后校准和 secondary analysis，不得进入训练或推理 feature；commanded action 缺失时
+样本必须 `blocked`，不能用零值或 hold 冒充。架构、hidden width、message aggregation 和
+rollout integrator 必须在正式训练前冻结；不得并行训练多个模型家族后根据 final 表现选择赢家。
+
+Action-free predictor 必须独立训练，使用与 action-conditioned 模型完全相同的 GNN backbone、
+总可训练参数量、training seeds、optimizer updates、数据曝光、搜索空间和调参次数，只把
+commanded action 替换为固定 mask token。模型选择只能查看 validation；不得在训练好的
+action-conditioned 模型上于推理时置零来冒充 action-free baseline。Copy-state 与
+constant-velocity 保持无训练的确定性 baseline，三项比较分别报告。
+
+**训练目标**
+
+Action-conditioned 与 action-free 使用相同的多步 open-loop branch rollout loss：每条 branch
+只在初始 `S_t` 提供 GT，后续状态全部使用模型前一步预测自回归。Loss 覆盖冻结的物理时间评分
+点，并使用与 primary scalar 相同的位置、对称性校正朝向、线速度和角速度归一化及等权聚合；
+不直接包含 paired `effect-vs-hold` 项。独立 evaluator 必须从 raw predictions 与 GT 重新计算
+primary endpoint，不得导入 trainer 的 loss 实现。
+
+Training seed 列表和数量由 power pilot 在 final test 前冻结，两个学习模型使用相同 seed 列表。
+每个 seed 只能按 validation primary error 选择一次 checkpoint；选择规则、最大 epochs 与 early
+stopping patience 必须预注册。全部 seeds 和对应冻结 checkpoint 都进入 final，统计先保持同一
+sibling group/模型 seed 的配对，再纳入 training-seed 层级；不得只报告最佳 seed、重抽 seed
+或在查看 final 后续训。
+
+两个学习模型使用完全相同且预注册的小型 hyperparameter grid、trial seed 列表和试验次数，
+但各自只按自己的 validation primary error 选择冻结配置。每个 trial 的 config、seed、状态、
+指标、wall time 和失败原因都必须进入 ledger；不得删除失败 trial、共享 final 结果或自适应
+扩大搜索。配置冻结后，final test 对全部预注册 training seeds 只运行一次。
+
+**资源预算**
+
+PR-02 从 calibration/power pilot、HPO 到正式训练合计不得超过 24 GPU-hours，其中 pilot 与
+HPO 合计不超过 8 GPU-hours，正式训练不超过 16 GPU-hours；单进程峰值显存不得超过 12 GiB。
+GPU preflight 和运行监控还必须保证桌面显示始终至少保留 1 GiB 实际可用显存；可分配给训练
+的显存取 12 GiB 与“运行时实际可用显存减 1 GiB”中的较小值。若其他进程占用导致余量不足，
+只能降低 batch size 或标记 `blocked`，不得启用独占模式或抢占显示保留。
+Cohort 生成累计不得超过 8 CPU wall-hours，全部 ignored `generated/pr02/` 产物不得超过
+100 GiB。Ledger 必须分别记录各阶段 wall time、GPU-hours、峰值显存、CPU time 和磁盘用量。
+若 power pilot 判断在这些上限内无法达到预注册统计功效，verdict 为 `blocked`；不得降低
+`δ`、置信区间、seed/group 要求或在看到结果后追加预算。
+
+只有进程崩溃、I/O 或瞬时 GPU OOM 等技术失败可以按完全相同的 seed/config 重试一次；改变
+batch size 等配置只允许在正式配置冻结前完成，冻结后不得以重试名义修改。NaN、模型不收敛、
+方向错误或指标未过门属于科学失败，不得重试、换 seed 或删除。全部额外 attempts 不得超过
+正式任务数的 5%；超出即将该次正式结果标记为 `invalid` 并调查根因。成功、失败和重试均须
+进入不可删除的 attempt ledger。
+
+**数据边界**
+
+使用 PR-01 已批准的 ManiSkill programmatic CPU primitive source 生成全新的 PR-02 sibling
+cohort，不下载外部数据。PR-02 的 seeds、scene layouts、object identities 和 lineage 必须与
+PR-01 完全隔离；PR-01 的 48 groups 只作为 contract/runtime 回归 fixture，不得进入 PR-02
+训练、调参、pilot、阈值估计或 final 统计。PR-02 内部仍按完整 object identity、scene layout
+和 sibling group 隔离 split，final test 在预注册后保持不可见。
+
+在正式 cohort 前运行完全隔离的 calibration/power pilot，只用于估计 evaluator noise、跨 seed
+波动、资源成本以及冻结归一化尺度、`δ`、`δ_shuffle`、train/validation/final group 数、硬预算
+和允许的技术重试。Pilot 的 seeds、identities、layouts 和 episodes 不得进入训练或 final 统计；
+正式 cohort 按冻结规格一次性生成，不得因中间或最终结果扩容、换 seed 或删除失败 group。
+
+Final split 必须代码级隔离：trainer、HPO 与 checkpoint selector 的 loader 遇到 final manifest
+时 fail closed。正式 inference 进程只能读取初始 ObjectState、commanded action schedule 和不含
+future 的 metadata，先原子发布不可变 raw predictions；GT future 只对独立 evaluator 可见。
+Experiment config、checkpoint manifests 和 prediction request checksums 冻结后，final 只按预注册
+attempt 规则运行一次，不能把 evaluator 结果反馈给 trainer、改配置或续训。
+
+**唯一 primary endpoint**
+
+在 held-out sibling groups 上，只评估 `Intervention.target_id` 指向对象的多步
+`effect-vs-hold` ObjectState 误差：分别从 action branch 与配对 hold branch 得到预测状态差，
+再与两条 GT branch 的状态差比较。聚合必须 group-first、每个 sibling group 等权，不能让
+episode 长度或非目标对象数量隐式改变裁决权重。一步预测、绝对状态误差、非目标对象与
+collateral effects 全部只作 secondary metrics。Primary scalar 覆盖位置、按对象对称性校正的
+朝向、线速度和角速度；每项除以隔离 pilot 的 robust scale 与 evaluator noise floor 的较大者，
+归一化后各占 25%。
+
+Rollout horizon 按物理时间定义，必须覆盖 push 执行与固定 post-action settling，不使用
+simulator steps 表达。具体 horizon 和评分时刻由与 final test 完全隔离的 pilot 在正式训练前
+冻结；pilot 不进入 final 统计，`PR-04` 必须复用同一时间协议。
 
 **裁决门**
 
-- 同时报告一步、多步和 `effect-vs-hold`，不只报告下一帧平均误差。
+- primary endpoint 只使用上述多步 `effect-vs-hold` 误差；同时报告预注册 secondary metrics，
+  不允许用下一帧平均误差替代主裁决。
 - `push(+x)` 与 `push(-x)` 的预测效果方向正确。
-- action-conditioned 胜 copy、constant-velocity 和 action-free 基线。
-- action shuffle 后性能按预注册门槛显著退化。
+- action-conditioned 必须分别胜过 copy-state、constant-velocity 和 action-free；三个比较各自
+  使用 group-first paired hierarchical bootstrap，primary error 降幅的 95% 置信区间下界都
+  必须超过隔离 pilot 在 final test 前冻结的最小实际增益 `δ`。任一比较未过门即不得判为
+  `supported`，不能用平均胜出或 secondary metric 替代。
+- action-shuffle 只在同一 split 及匹配的对象、场景和动作支持分层内做固定 seed 的确定性
+  重排，保持动作边际分布但打断 state-action 配对；不得产生训练支持范围外的动作。相对正确
+  action，primary error 增幅的 group-first paired bootstrap 95% 置信区间下界必须超过在 final
+  test 前冻结的 `δ_shuffle`。
 - 固定数据、参数预算、seed 和 object/scene/sibling split；final test 的 object identities
   与 scene layouts 不得出现在 train/validation，动作支持范围保持一致。
+
+最终 verdict 采用全门联合判定：以上三个 baseline comparisons、`push(+x/-x)` direction、
+action-shuffle、split/leakage、独立 audit、资源和 retry gates 必须全部通过才是 `supported`，
+不得以加权总分、secondary metric 或 Demo 抵消任何失败。协议有效但任一科学门未过为
+`rejected`；缺失必需数据、GT、功效或预算内无法运行是 `blocked`；schema/version、lineage、
+future leakage、split、attempt 或执行协议损坏是 `invalid`。
+
+**实现切片**
+
+| 切片 | 单一可证伪目标 | 最小交付与进入下一片的门 |
+| --- | --- | --- |
+| `PR-02A Contract` | `0.3.0` 能无歧义承载 PR-02 evidence | 本地 supported 并已提交：7 schemas、6 records/positive fixtures、39 negatives；旧 5 contracts 字节冻结；尚无远端验证 |
+| `PR-02B Pilot/Data Freeze` | 隔离 pilot 能在硬预算内冻结可执行实验 | source audit、calibration/power report、全部数值阈值、split/seed/config/resource freeze；未达功效即 `blocked` |
+| `PR-02C Trainer/Baselines` | clean GPU runtime 能可复现训练四个预注册 arms | 精确 lock、copy/constant/action-free/action-conditioned、trial ledger、checkpoint manifests、固定小型 golden training group |
+| `PR-02D Independent Audit` | 独立 evaluator 能从 raw predictions 重算全部 hard gates | 禁止导入 trainer loss、统计复算、lineage/泄漏检查、mutation matrix；必须先于 formal experiment |
+| `PR-02E Formal Experiment` | 冻结实验能一次性给出科学 verdict | 全部预注册 seeds/configs、隐藏 final、三 baseline 比较、shuffle/direction/resource/retry gates、完整负结果 |
+| `PR-02F Delivery/CI` | 评审者能从冻结 evidence 独立验收结论 | machine/human report、checksums、轨迹/residual Demo、accept command 与不夸大 GPU 能力的 CI |
+
+六片严格串行；任何前置切片为 `rejected`、`blocked` 或 `invalid` 时不得通过补写 Delivery 或
+放宽后续门继续推进。
+
+无 GitHub GPU runner 时，远端 CI 只运行 `0.3.0` contract、CPU tiny-fixture trainer smoke、
+独立 evaluator 与 mutation tests，并验证本机正式报告的 schema、checksums 和 lineage。正式
+GPU experiment 由已授权宿主按冻结规格运行；CI 状态与科学 verdict 分账，远端不得声称已经
+重跑、复现或支持本机 GPU 结论。
 
 **失败路径**
 
@@ -473,7 +677,10 @@ constant-velocity 和 action-free predictor 更准确地预测干预效果。
 
 **Demo**
 
-显示动作箭头、各基线预测轨迹、真实轨迹和 effect-vs-hold residual。
+只提供 Web、无 notebook。页面从已审计、checksum-valid 的 Delivery artifacts 读取数据，显示
+动作箭头、GT 与 copy-state、constant-velocity、action-free、action-conditioned 四个 arms 的
+多步轨迹、`effect-vs-hold` residual、置信区间、verdict 和失败 groups。Machine report 是唯一
+事实源，Web 只解释证据；浏览器不运行 simulator、trainer、evaluator，不访问 CDN 或外部资产。
 
 ## 7. PR-03：Canonical Object Gaussian
 
@@ -898,7 +1105,12 @@ demo command
 | `PR-01D` | `pr/01d-invariance-audit` | independent audit、four-state report、mutations |
 | `PR-01E` | `pr/01e-formal-cohort` | preflight、group-first split、formal cohort |
 | `PR-01F` | `pr/01f-sibling-delivery` | state replay、report/checksums、accept command、CI |
-| `PR-02` | `pr/02-state-dynamics` | state baselines、action-conditioned dynamics、metrics |
+| `PR-02A` | `pr/02a-dynamics-contract` | `0.3.0` schemas、fixtures、version dispatch |
+| `PR-02B` | `pr/02b-dynamics-pilot` | source audit、calibration/power pilot、data/spec freeze |
+| `PR-02C` | `pr/02c-dynamics-trainer` | clean GPU trainer、baselines、trial/checkpoint lineage |
+| `PR-02D` | `pr/02d-dynamics-audit` | independent evaluator、statistics、leakage/mutation audit |
+| `PR-02E` | `pr/02e-dynamics-formal` | frozen formal training/evaluation 与 scientific verdict |
+| `PR-02F` | `pr/02f-dynamics-delivery` | reports、checksums、trajectory Demo、accept command、CI |
 | `PR-03` | `pr/03-canonical-gaussian` | canonical representation、fusion、renderer evaluation |
 | `PR-04` | `pr/04-gaussian-ablation` | controlled representation ablation 与决策报告 |
 | `PR-05` | `pr/05-hocap-adapter` | approved multiview adapter、teacher/student boundary |
@@ -914,23 +1126,29 @@ demo command
 实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A。新项目当前保持私有并按
 all rights reserved 管理；对外发布前重新决策许可证。以下前置决策仍未完成：
 
-- PR-02 之后的训练栈和长期模型目录；
-- 各 PR 的正式数值阈值、统计检验和资源预算；
+- PR-03 之后的 representation/training 栈和长期源码目录；
+- PR-03 之后各 PR 的正式数值阈值、统计检验和资源预算；
 - 目标机器人、动作空间、控制频率和安全规范。
 
 Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的预注册实验裁决。
+PR-02 的训练栈、统计方法和硬资源上限已经确认；具体 horizon、scales、`δ`、`δ_shuffle`、
+group/seed 数和训练配置必须由 `PR-02B` 隔离 pilot 产出并冻结，不属于可在 formal 结果后补做的
+Owner 选择。
 
 ## 20. 下一步
 
 当前工作区无需同步旧仓库。顺序更新为：
 
 1. Stage-0 已由 `c1927b1` 提交；继续保持外部审计样例 ignored，不推送数据。
-2. `PR-00` 已由 `b4107fa` 提交；不 push，远端 GitHub Actions 只有实际运行后才能记为 CI
-   证据。
+2. `PR-00` 已由 `b4107fa` 提交；代码承载验收 SHA `234ba00` 的远端 PR-00 check 已成功，
+   后续提交只有实际运行远端 GitHub Actions 后才能继承 CI 证据。
 3. RES-001 已完成 ManiSkill `3.0.1` 的上游版本、wheel/hash、许可、snapshot/reset 和平台审计；
    Owner 已批准 A 并允许 GPU compute runtime；CPython 3.12 的 `A-0` 已在 resolver 阶段失败，
    CPython 3.10.20 的 `A-1` 已通过安装、import、宿主 GPU probe、freeze、磁盘和空资产检查。
 4. Snapshot/RNG fork 与 programmatic CPU primitive action/contact gate 都已用两个独立进程
    `supported`；后者只批准 PR-01 primitive push source。
 5. PR-01A–F 的代码承载验收 SHA `234ba00` 已由 clean `accept-pr01` 完整 `supported`，同一 SHA
-   的六项远端 Actions 全部成功。PR-01 门已关闭，下一阶段按队列进入 PR-02 的独立决策与预注册。
+   的六项远端 Actions 全部成功，PR-01 门已关闭。
+6. PR-02A Contract 已在本地实现并由 `npm run contract:pr02a` 与 `npm run check` 得到
+   `supported`，且已提交；当前尚无远端 CI 证据。下一步 PR-02B pilot/data freeze 仍需独立
+   动作授权。

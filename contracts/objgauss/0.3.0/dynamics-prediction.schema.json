@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/dynamics-prediction.schema.json",
+  "title": "ObjGauss PR-02 Raw Dynamics Prediction",
+  "description": "Immutable pre-evaluation ObjectState rollout produced without access to future ground truth.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "identity",
+    "inputs",
+    "horizon",
+    "predictions",
+    "prediction_payload_sha256",
+    "publication",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "contract_kind": { "const": "objgauss.dynamics_prediction" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "horizon": { "$ref": "#/$defs/horizon" },
+    "predictions": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/timePoint" }
+    },
+    "prediction_payload_sha256": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+    },
+    "publication": { "$ref": "#/$defs/publication" },
+    "provenance": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/provenance"
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/identifier"
+    },
+    "availableIdentifier": {
+      "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/availableIdentifier"
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "experiment_id",
+        "prediction_id",
+        "group_id",
+        "branch_id",
+        "split",
+        "model_arm",
+        "trial_id",
+        "checkpoint_id",
+        "training_seed"
+      ],
+      "properties": {
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "prediction_id": { "$ref": "#/$defs/identifier" },
+        "group_id": { "$ref": "#/$defs/identifier" },
+        "branch_id": { "$ref": "#/$defs/identifier" },
+        "split": { "enum": ["validation", "test", "fixture"] },
+        "model_arm": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/modelArm"
+        },
+        "trial_id": { "$ref": "#/$defs/availableIdentifier" },
+        "checkpoint_id": { "$ref": "#/$defs/availableIdentifier" },
+        "training_seed": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["availability", "value"],
+              "properties": {
+                "availability": { "const": "present" },
+                "value": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+              },
+              "unevaluatedProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["availability", "reason"],
+              "properties": {
+                "availability": { "const": "missing" },
+                "reason": { "const": "not_applicable" }
+              },
+              "unevaluatedProperties": false
+            }
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "source_episode",
+        "initial_objectstate_sha256",
+        "commanded_action_sha256",
+        "target_object_id",
+        "visible_fields",
+        "commanded_action_present",
+        "executed_action_is_feature",
+        "gt_future_read"
+      ],
+      "properties": {
+        "source_episode": { "$ref": "#/$defs/sourceEpisodeReference" },
+        "initial_objectstate_sha256": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+        },
+        "commanded_action_sha256": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+        },
+        "target_object_id": { "$ref": "#/$defs/identifier" },
+        "visible_fields": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "initial_objectstate" },
+            { "const": "commanded_action_schedule" },
+            { "const": "non_future_metadata" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "commanded_action_present": { "const": true },
+        "executed_action_is_feature": { "const": false },
+        "gt_future_read": { "const": false }
+      },
+      "unevaluatedProperties": false
+    },
+    "sourceEpisodeReference": {
+      "type": "object",
+      "required": ["uri", "media_type", "sha256", "schema_version", "lineage_sha256"],
+      "properties": {
+        "uri": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/artifactPath"
+        },
+        "media_type": { "const": "application/json" },
+        "sha256": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+        },
+        "schema_version": { "const": "0.2.0" },
+        "lineage_sha256": {
+          "$ref": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.3.0/common.schema.json#/$defs/sha256"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "horizon": {
+      "type": "object",
+      "required": ["unit", "duration_s", "scoring_times_s"],
+      "properties": {
+        "unit": { "const": "physical_seconds" },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "scoring_times_s": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "vector3": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "quaternion": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "objectState": {
+      "type": "object",
+      "required": ["object_id", "position_W_m", "quaternion_WO_wxyz", "linear_velocity_W_m_s", "angular_velocity_W_rad_s"],
+      "properties": {
+        "object_id": { "$ref": "#/$defs/identifier" },
+        "position_W_m": { "$ref": "#/$defs/vector3" },
+        "quaternion_WO_wxyz": { "$ref": "#/$defs/quaternion" },
+        "linear_velocity_W_m_s": { "$ref": "#/$defs/vector3" },
+        "angular_velocity_W_rad_s": { "$ref": "#/$defs/vector3" }
+      },
+      "unevaluatedProperties": false
+    },
+    "timePoint": {
+      "type": "object",
+      "required": ["time_s", "objects"],
+      "properties": {
+        "time_s": { "type": "number", "exclusiveMinimum": 0 },
+        "objects": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/objectState" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "required": ["atomic_publish", "immutable_after_publish"],
+      "properties": {
+        "atomic_publish": { "const": true },
+        "immutable_after_publish": { "const": true }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}
