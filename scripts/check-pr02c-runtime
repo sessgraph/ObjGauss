@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LEARNING_ROOT="$ROOT/learning"
+PUBLISH_ROOT="$ROOT/generated/pr02c/runtime"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  printf 'invalid: PR-02C C0 acceptance requires a clean checkout\n' >&2
+  exit 4
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+if [[ "$(node --version)" != v24.18.0 ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$(node --version)" >&2
+  exit 3
+fi
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+mkdir -p "$ROOT/generated/pr02c"
+WORK_ROOT="$(mktemp -d "$ROOT/generated/pr02c/runtime.XXXXXX")"
+VENV="$WORK_ROOT/venv"
+REPORT_URI="${WORK_ROOT#"$ROOT/"}/report.json"
+VERIFY_URI="${WORK_ROOT#"$ROOT/"}/verification-report.json"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+npm run check
+
+export UV_PROJECT_ENVIRONMENT="$VENV"
+uv sync \
+  --project "$LEARNING_ROOT" \
+  --frozen \
+  --no-dev \
+  --no-install-project \
+  --no-build
+uv sync \
+  --project "$LEARNING_ROOT" \
+  --frozen \
+  --no-dev
+
+export UV_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export OBJGAUSS_LEARNING_OFFLINE=1
+export PYTHONDONTWRITEBYTECODE=1
+
+"$VENV/bin/python" -m unittest discover \
+  -s "$LEARNING_ROOT/tests" \
+  -p 'test_runtime.py' \
+  -v
+"$VENV/bin/objgauss-pr02c-runtime" \
+  --repo-root "$ROOT" \
+  --source-commit "$SOURCE_COMMIT" \
+  --output "$REPORT_URI"
+node scripts/verify-pr02c-runtime.mjs \
+  --report "$REPORT_URI" \
+  --output "$VERIFY_URI"
+
+(
+  cd "$WORK_ROOT"
+  sha256sum report.json verification-report.json > checksums.sha256
+  sha256sum --quiet -c checksums.sha256
+)
+
+rm -rf -- "$PUBLISH_ROOT"
+mv "$WORK_ROOT" "$PUBLISH_ROOT"
+trap - EXIT
+
+node --input-type=module -e '
+import { readFileSync } from "node:fs";
+const report = JSON.parse(readFileSync("generated/pr02c/runtime/report.json", "utf8"));
+const verification = JSON.parse(readFileSync("generated/pr02c/runtime/verification-report.json", "utf8"));
+console.log(JSON.stringify({
+  verdict: report.verdict.status,
+  reason_code: report.verdict.reason_code,
+  source_commit: report.producer.source_commit,
+  runtime_lock_sha256: report.inputs.runtime_lock_sha256,
+  check_count: verification.checks.length,
+  evidence_root: "generated/pr02c/runtime",
+}));
+'

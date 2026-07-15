@@ -1,0 +1,55 @@
+{
+  "manifest_version": "0.1.0",
+  "manifest_kind": "objgauss.pr02c-runtime-manifest",
+  "runtime": {
+    "python": "3.10.20",
+    "torch_distribution": "2.13.0",
+    "torch_runtime": "2.13.0+cu130",
+    "torch_cuda": "13.0",
+    "dependency_policy": "pure-pytorch-no-pyg-lightning-hydra"
+  },
+  "inputs": {
+    "runtime_lock": {
+      "path": "learning/uv.lock",
+      "sha256": "a90c27d88e5e469593c608b1b865adab9fd57ac7e36dceb54256930fa8de7eb5"
+    },
+    "hyperparameter_grid": {
+      "path": "contracts/fixtures/pr02b/hyperparameter-grid.json",
+      "sha256": "f95e34a47cf624f7f8dc6cdcc4c159aa4eb7cb9f8354f86bfbed4158d79a51be"
+    }
+  },
+  "isolation": {
+    "forbidden_distributions": [
+      "mani-skill",
+      "sapien",
+      "objgauss-sim"
+    ],
+    "forbidden_modules": [
+      "mani_skill",
+      "sapien",
+      "objgauss_sim"
+    ],
+    "simulator_import_allowed": false,
+    "network_policy": "offline-during-runtime"
+  },
+  "resources": {
+    "display_vram_reserve_bytes_min": 1073741824,
+    "training_peak_vram_bytes_max": 12884901888,
+    "probe_allocation_bytes": 16777216
+  },
+  "outputs": {
+    "root": "generated/pr02c/",
+    "git_ignored": true,
+    "atomic_publish_required": true
+  },
+  "claim_boundary": {
+    "supported_claim": "clean-isolated-pytorch-runtime-is-available",
+    "excluded_claims": [
+      "formal-cohort-generated",
+      "trainer-implemented",
+      "model-performance",
+      "scientific-baseline-comparison",
+      "gaussian-dynamics-value"
+    ]
+  }
+}

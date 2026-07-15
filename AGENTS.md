@@ -8,8 +8,9 @@
 ### 当前事实
 
 - 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 与 PR-02B
-  pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C trainer 尚未授权。准确动态
-  状态以 `docs/state/` 为准。
+  pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C Trainer/Baselines 已获动作
+  授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已实现、正等待 clean HEAD
+  验收；loader、formal cohort、模型与 trainer 尚未实现。准确动态状态以 `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
@@ -109,8 +110,8 @@
 
 ### 当前明确不做
 
-- 除已批准的 Stage-0、PR-00 与 PR-01A–F 严格 sibling evidence 里程碑外，不实现模型、服务、
-  公共 API、长期持久化或机器人控制。
+- 除已批准的 Stage-0、PR-00、PR-01A–F 严格 sibling evidence 里程碑与 ADR-006 界定的 PR-02C
+  Trainer/Baselines 外，不实现模型、服务、公共 API、长期持久化或机器人控制。
 - 不把旧 M2、BOP、RBO、NeRF Lego 或 Hugging Face 结果当作新项目当前基线。
 - 不在 Identity Gate 之前扩展复杂因果头、diffusion、replay buffer 或自生成训练。
 - 不按“适配一个数据集”打包模型、评估和 Demo 等多个无法独立裁决的目标。
@@ -119,7 +120,7 @@
 ### 关键风险
 
 - 长期产品目标、PR-03 之后的技术栈/资源预算和未来对外发布许可证尚未由 Owner 确认；
-  PR-02 的硬上限已确认，但具体阈值、group/seed 数和训练配置仍须由隔离 pilot 实测冻结。
+  PR-02 的硬上限、阈值、group/seed 数与训练配置已由隔离 pilot 冻结，但尚无训练证据。
 - Stage-0 固定 `.splat` 的直接上游位置、大小和哈希已核验，但其资产生成 provenance 仍未
   核验；大多数外部数据集字段、版本、规模和许可也尚未用上游一手资料复核。
 - 身份、坐标、future leakage 和 sibling split 错误会污染后续动力学与因果结论。
@@ -137,8 +138,8 @@
 | 当前实际文件与改动 | 文件系统、git status --short 和可复现命令结果 |
 | 稳定协作与授权规则 | 本文件 |
 | 公共机器 contract | `contracts/objgauss/0.1.0/`、`0.2.0/` 与 `0.3.0/`；必须精确版本分派 |
-| 架构与 ADR | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，ADR-003 覆盖 PR-01，ADR-004 覆盖 PR-02A contract，ADR-005 覆盖 PR-02B pilot/data freeze |
-| 已实现行为 | src/pr00/、src/pr01/、sim/、viewer/、scripts/、tests/ 与可复现命令结果 |
+| 架构与 ADR | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，ADR-003 覆盖 PR-01，ADR-004 覆盖 PR-02A contract，ADR-005 覆盖 PR-02B pilot/data freeze，ADR-006 覆盖 PR-02C trainer/baselines |
+| 已实现行为 | src/pr00/、src/pr01/、sim/、learning/、viewer/、scripts/、tests/ 与可复现命令结果 |
 
 代码决定“现在实际发生什么”；Owner 已批准的 PRD、contract、task 和 ADR 决定“规范要求
 什么”；README 或状态摘要只是上述事实的投影。来源冲突时先复现和定位，不静默选择方便
@@ -162,7 +163,7 @@
 | docs/state/ | 动态 PR 执行状态、项目状态、风险与开放事项 |
 | REFERENCES.md | 资源、外部地址、归档、许可和历史证据台账 |
 | AGENTS.md | 根级协作、授权、验证和安全规则 |
-| docs/adr/ | 已批准的长期技术取舍；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，ADR-003 覆盖 PR-01，ADR-004 覆盖 PR-02A，ADR-005 覆盖 PR-02B |
+| docs/adr/ | 已批准的长期技术取舍；ADR-001–006 分别覆盖 Stage-0、PR-00、PR-01、PR-02A、PR-02B 与 PR-02C |
 | contracts/objgauss/0.1.0/ | PR-00 唯一 JSON Schema contract；已发布版本不得原地修改 |
 | contracts/objgauss/0.2.0/ | PR-01 episode/experiment/attempt/invariance-report 四份 JSON Schema |
 | contracts/objgauss/0.3.0/ | PR-02 dynamics experiment、training trial/attempt、checkpoint、prediction、evaluation report 与 shared definitions |
@@ -170,9 +171,10 @@
 | src/pr00/ | frame math、validator、producer、evaluator、verdict 与 browser consumer 源码 |
 | src/pr01/ | PR-01 contract dispatch 与独立 auditor；auditor 不得导入 simulator 或 writer |
 | sim/ | PR-01 隔离 Python package、精确 uv lock、程序化 primitive runtime、adapter、原子 writer，以及 PR-02B calibration/power freeze producer；只供离线证据生成，不含 trainer |
+| learning/ | PR-02C 独立纯 PyTorch package、精确 uv lock 与 C0 runtime/isolation/GPU probe；当前不含 loader、模型或 trainer，禁止导入 simulator |
 | viewer/ | Stage-0 WebGL2 Gaussian 世界、PR-00 同步 contract 证据页与 PR-01 无 RGB 五联回放源码 |
-| scripts/ | PR-00/PR-01/PR-02A contract audit、build/syntax、Stage-0 预览获取、RES-001/PR-01 source pilots、PR-01 clean-install gates 与 PR-02B clean pilot/freeze verifier |
-| tests/、sim/tests/ | Stage-0、PR-00、PR-01、PR-02A contract 与 PR-02B pilot/freeze、simulator runtime、writer 的行为和负例测试 |
+| scripts/ | PR-00/PR-01/PR-02A contract audit、build/syntax、Stage-0 预览获取、RES-001/PR-01 source pilots、PR-01 clean-install gates、PR-02B clean pilot/freeze verifier 与 PR-02C C0 clean runtime gate |
+| tests/、sim/tests/、learning/tests/ | Stage-0、PR-00、PR-01、PR-02A contract、PR-02B pilot/freeze 与 PR-02C C0 runtime/isolation 的行为和负例测试 |
 | generated/pr00/ | Git ignored 的确定性 episode、数组、报告与 browser bundle；不得手改或提交 |
 | generated/pr01b/ | Git ignored 的 canonical/reverse runtime smoke 报告；可重建、不得提交 |
 | generated/pr01c/ | Git ignored 的 golden group 与 writer 报告；可重建、不得提交 |
@@ -180,15 +182,16 @@
 | generated/pr01e/ | Git ignored 的 preflight/formal cohort 与 audit 输出；可重建、不得提交 |
 | generated/pr02a/ | Git ignored 的 PR-02A contract machine report；由正式 audit 重建，不得提交 |
 | generated/pr02b/ | Git ignored 的 PR-02B repeat/audit/freeze evidence；只有 clean gate 生成的 `evidence/` 可用于验收，仍不得提交 |
+| generated/pr02c/ | Git ignored 的 PR-02C runtime、训练与后续证据根；C0 当前只允许 clean gate 原子发布 `runtime/`，不得提交 |
 | artifacts/pr01/ | Git ignored 的最终 Delivery 投影；只由 clean-checkout 验收生成，不得提交 |
 | package.json、package-lock.json、.node-version | PR-00 命令、精确依赖解析与 Node runtime 事实源 |
 | .github/workflows/ | PR-00 Node 门与 PR-01 runtime/writer/audit/cohort/delivery 门；不部署或发布 |
 | data/ | Git ignored 本地数据；不得提交 |
 | .git 中的归档标签 | 旧项目只读恢复点，不是当前源码目录 |
 
-当前没有模型包或训练数据目录。PR-02A 已建立 `0.3.0` contract；PR-02B 只负责隔离 pilot 与
-data/config/resource freeze。只有其 clean freeze gate 通过并另行取得 PR-02C 授权后，才能建立
-真实 `learning/` package。不要预建空结构或假想扩展点。
+`learning/` 当前只实现 PR-02C C0 的精确 runtime、隔离与资源门，不是模型能力；仍没有 loader、
+formal cohort、模型、trainer 或 checkpoint。后续只按 ADR-006 的串行门增加真实调用方，不预建
+空结构或假想扩展点。
 
 ## 4. 当前权威命令
 
@@ -226,12 +229,14 @@ data/config/resource freeze。只有其 clean freeze gate 通过并另行取得 
 | PR-02A contract tests | `node --test tests/pr02a-contracts.test.mjs`；同时由 `npm test` / `npm run check` 覆盖 |
 | PR-02B pilot unit tests | `npm run test:pr02b` 与 `PYTHONPATH=sim/src python3 -m unittest sim.tests.test_pr02_pilot`；不需要 simulator asset 或 GPU |
 | PR-02B clean pilot/data freeze | `./scripts/check-pr02b-pilot`；要求 clean checkout、Node 24.18.0、uv 0.11.17、冻结 runtime、离线/空资产，生成 canonical/reverse source、独立 audits、GPU 1 GiB 显示保留 probe、`0.3.0` experiment 与 checksum/lineage verification |
+| PR-02C C0 unit tests | `npm run test:pr02c` 与 `uv run --project learning --frozen --no-dev python -m unittest discover -s learning/tests -p 'test_runtime.py'`；分别覆盖 manifest/lock 静态门与 Python runtime 失败语义 |
+| PR-02C C0 clean runtime gate | `./scripts/check-pr02c-runtime`；要求 clean checkout、Node 24.18.0、uv 0.11.17、CPython 3.10.20、精确 `learning/uv.lock`、离线且无 simulator 的新 venv，并验证 CUDA 13.0、12 GiB cap、至少 1 GiB 显示显存保留、HEAD/lock/grid lineage 与独立 verifier |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。
 Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md，PR-00 决策见
-docs/adr/0002-pr00-contract-stack.md；PR-02 实现 ADR 必须把本表更新为与未来 lockfile、任务脚本和
-CI 一致的可复制命令。PR-03 之后的模型/表示栈仍须另行决定。
+docs/adr/0002-pr00-contract-stack.md；PR-02C C0 的真实命令已与 `learning/uv.lock` 和脚本同步，
+loader/trainer 与 PR-02D–F 命令仍尚未定义。PR-03 之后的模型/表示栈仍须另行决定。
 
 ## 5. 会话启动协议
 
@@ -266,10 +271,11 @@ CI 一致的可复制命令。PR-03 之后的模型/表示栈仍须另行决定�
 - 行为变化必须有行为级测试；无法自动化时提供固定输入、复现步骤和残余风险。
 - 不删除测试、skip、放宽断言、吞异常或擅自更新阈值/基线来制造通过。
 
-Owner 对 Stage-0、PR-00、PR-01A–F、PR-02A Contract 和 PR-02B Pilot/Data Freeze 的实现
-授权已经给出。PR-02A 不得外推为 pilot、数据或模型证据；PR-02B 不得外推为 trainer 或模型
-性能证据。`learning/` package、训练依赖和后续训练仍须按队列另行获得动作级授权。不得借此
-开始 Gaussian dynamics、外部数据、RGB/GPU renderer 或机器人控制。
+Owner 对 Stage-0、PR-00、PR-01A–F、PR-02A Contract、PR-02B Pilot/Data Freeze 和 PR-02C
+Trainer/Baselines 的实现授权已经给出。PR-02A 不得外推为 pilot、数据或模型证据；PR-02B
+不得外推为 trainer 或模型性能证据；PR-02C 授权只覆盖 accepted ADR-006 冻结的独立
+`learning/` package、精确纯 PyTorch 依赖、四个预注册 arms 与本地训练证据。不得借此开始
+PR-02D、PR-02E、Gaussian dynamics、外部数据、RGB/GPU renderer 或机器人控制。
 
 ## 7. 数据、Contract 与研究证据
 
@@ -353,7 +359,7 @@ PR-00、PR-01 与 PR-02 字段和序列化分别以对应精确版本的唯一�
 | 已确认目标、角色、术语、规则与例外 | docs/PRD.md |
 | 公共字段与机器 contract | contracts/objgauss/ 下对应精确版本的唯一 schema；当前为 `0.1.0`、`0.2.0` 与 `0.3.0` |
 | 当前任务、非目标、验收和队列 | docs/PROJECT_PLAN.md |
-| 长期架构取舍 | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，ADR-003 覆盖 PR-01，ADR-004 覆盖 PR-02A contract，ADR-005 覆盖 PR-02B pilot/data freeze |
+| 长期架构取舍 | docs/adr/；ADR-001–006 已 accepted，分别覆盖 Stage-0 至 PR-02C 当前切片 |
 | 候选数据、资产、许可和归档事实 | REFERENCES.md |
 | 稳定协作与授权边界 | AGENTS.md |
 | 开放问题 | 当前写入 docs/PRD.md 第 13 节或计划评审清单 |

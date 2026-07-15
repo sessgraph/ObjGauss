@@ -271,9 +271,36 @@ index 全部通过；pilot report SHA-256 为 `47ad53c6…944cc`，ignored evide
 `generated/pr02b/evidence/`。
 
 PR-02B 因此为本地 `supported`，但尚无远端 CI。本切片不创建 `learning/`、不训练模型，也不
-支持任何模型性能、Gaussian dynamics、外部数据泛化或机器人控制声明；PR-02C 仍需 Owner
-单独授权。长期取舍见
+支持任何模型性能、Gaussian dynamics、外部数据泛化或机器人控制声明。Owner 已另行授权
+PR-02C 进入规划。Owner 已选择延迟物化 final test：PR-02C 只生成 train/validation 60 groups，
+12 个 test groups 在 PR-02E 前只保留冻结 spec；rollout 已冻结为四个评分区间共享、显式 `Δt`
+与 commanded-action schedule 的 residual transition；HPO config 按 validation groups 和 3 seeds
+两级等权平均选择。ADR-006 已 accepted；PR-02C C0 独立 runtime/contract gate 已实现，仍未
+生成 formal cohort、实现模型/trainer 或运行训练。
+长期取舍见
 [`ADR-005`](docs/adr/0005-pr02b-pilot-data-freeze.md)。
+
+PR-02C 的实施与验收边界见
+[`ADR-006`](docs/adr/0006-pr02c-trainer-baselines.md)。它只负责独立纯 PyTorch runtime、四个
+预注册 arms、training lineage 和 reproducibility gate；独立科学 evaluator 与 final verdict
+仍属于 PR-02D/PR-02E。
+
+### 验证 PR-02C C0 Runtime
+
+```bash
+./scripts/check-pr02c-runtime
+```
+
+该门只在 clean checkout 上运行：使用 `learning/uv.lock` 创建全新纯 PyTorch venv，要求
+CPython `3.10.20`、`torch==2.13.0+cu130`、CUDA `13.0`、离线运行且不存在 ManiSkill、SAPIEN
+或 `objgauss-sim`，并独立复核 HEAD、package tree、lock、PR-02B grid、12 GiB cap 和至少
+1 GiB 的桌面显示显存保留。成功证据原子写入 ignored `generated/pr02c/runtime/`。
+
+当前状态是 `c0_implemented_pending_clean_acceptance`：12 个 Python 行为/失败测试、4 个 Node
+freeze 测试和全库 `npm run check` 已在 dirty 开发树上通过；真实 RTX 5060 Ti 的诊断 probe 也
+满足精确 CUDA runtime 与显示显存保留，但这些都不替代绑定最终提交的 clean gate。C0 只支持
+“独立纯 PyTorch runtime 可用”这一窄声明，不支持 trainer、模型性能、科学比较或 Gaussian
+dynamics 价值声明。
 
 ## 项目事实源
 

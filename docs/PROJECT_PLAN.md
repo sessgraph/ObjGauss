@@ -3,8 +3,9 @@
 > 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；代码承载验收 SHA `234ba00` 的 clean 一键验收
 > 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭；PR-02A 已本地实现、通过项目门并
 > 提交，但尚未取得远端 CI 证据；PR-02B 已提交，并在代码承载 SHA `04ddb18` 上完成 clean
-> acceptance，pilot/data freeze 为本地 `supported`；PR-02C 尚未授权
-> 版本：0.18
+> acceptance，pilot/data freeze 为本地 `supported`；PR-02C 已获动作授权，C0 runtime gate 已
+> 实现并等待 clean HEAD 验收
+> 版本：0.20
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -87,7 +88,20 @@
 >   attempts，独立 source audits、canonical/reverse 语义、GPU 1 GiB 显示保留和 21 项 freeze
 >   verification 均为 `supported`。权威 pilot report SHA-256 为
 >   `47ad53c6…944cc`；排障期的一次 source rejection 与一次量纲错误 blocked 继续保留为负证据。
->   该事实只关闭 PR-02B，不授权 PR-02C，也不支持模型性能或 Gaussian dynamics 声明。
+>   该事实本身只关闭 PR-02B，也不支持模型性能或 Gaussian dynamics 声明。
+> - `confirmed_fact`：Owner 已于 2026-07-15 单独授权 PR-02C Trainer/Baselines 并要求先规划。
+>   ADR-006 的三个规划问题已经冻结并提升为 accepted；C0 已建立 `learning/`、精确 lock、
+>   runtime/isolation/GPU probe 与独立 verifier，仍未建立 formal cohort、loader、模型、trainer、
+>   checkpoint 或模型结果。C0 的最终 clean HEAD acceptance 尚待提交后运行。
+> - `decision`：PR-02C 只物化 48 train + 12 validation groups；12 个 final test groups 在
+>   PR-02E 配置/checkpoint 冻结前只保留 PR-02B spec，不生成 episode、trajectory 或 GT future。
+>   PR-02C 出现任何 test 数据产物均为 `invalid`，不能只依赖 loader 权限补救。
+> - `decision`：PR-02C learned rollout 只在 `[0.0, 0.1, 0.2, 0.5, 1.1] s` 相邻区间复用同一
+>   residual transition，显式输入物理 `Δt` 与裁剪到该区间的 commanded-action schedule；初态后
+>   不再 teacher-force。Executed action 和区间终点 GT 不得进入模型 feature。
+> - `decision`：PR-02C 每个 arm/config 先对 12 个 validation sibling groups group-first 等权，
+>   再对全部 3 个 training seeds 等权平均选择单一 config；任一 seed 缺失则该 config 不可入选，
+>   平局按冻结 config ID。不得用 best seed、中位数或不完整 config 替代。
 > - `decision`：`PR-04` 的唯一 primary endpoint 是 held-out sibling groups 上的多步
 >   `effect-vs-hold` ObjectState 预测误差。
 > - `decision`：该 endpoint 使用 group-first paired aggregation；每个 sibling group 等权，
@@ -536,9 +550,10 @@ constant-velocity 和 action-free predictor 更准确地预测干预效果。
 模型源码使用独立 `learning/` Python package，固定 CPython `3.10.20`、`uv` 和精确 lock 的纯
 PyTorch，不引入 PyG、Lightning 或 Hydra。`learning/` 消费冻结的 contract artifacts，不导入
 ManiSkill/SAPIEN；`sim/` 只负责生成不可变 evidence，不承载 trainer 或模型。训练日志、模型
-输出和 checkpoint 只写入 ignored `generated/pr02/`，不得进入 Git。具体 PyTorch wheel/version、
-模型家族和训练命令仍须在实现前由 PR-02 ADR 与 clean GPU probe 固定；本计划不授权预建目录、
-安装依赖或开始训练。
+输出和 checkpoint 只写入 ignored `generated/pr02/`，不得进入 Git。PR-02B 已冻结
+`torch==2.13.0+cu130`、CUDA `13.0`、唯一 minimal Object GNN family 与 4-config grid；PR-02C
+获准按 accepted ADR-006 建立精确 lock 和真实 package，不得加入未批准的生产依赖或在 dirty
+source 上训练。
 
 **机器 contract**
 
@@ -664,7 +679,7 @@ future leakage、split、attempt 或执行协议损坏是 `invalid`。
 | --- | --- | --- |
 | `PR-02A Contract` | `0.3.0` 能无歧义承载 PR-02 evidence | 本地 supported 并已提交：7 schemas、6 records/positive fixtures、39 negatives；旧 5 contracts 字节冻结；尚无远端验证 |
 | `PR-02B Pilot/Data Freeze` | 隔离 pilot 能在硬预算内冻结可执行实验 | source audit、calibration/power report、全部数值阈值、split/seed/config/resource freeze；未达功效即 `blocked` |
-| `PR-02C Trainer/Baselines` | clean GPU runtime 能可复现训练四个预注册 arms | 精确 lock、copy/constant/action-free/action-conditioned、trial ledger、checkpoint manifests、固定小型 golden training group |
+| `PR-02C Trainer/Baselines` | clean GPU runtime 能公平、可复现地运行四个预注册 arms，并训练两个 learned arms | 精确 lock、copy/constant/action-free/action-conditioned、trial ledger、checkpoint manifests、固定小型 golden training group |
 | `PR-02D Independent Audit` | 独立 evaluator 能从 raw predictions 重算全部 hard gates | 禁止导入 trainer loss、统计复算、lineage/泄漏检查、mutation matrix；必须先于 formal experiment |
 | `PR-02E Formal Experiment` | 冻结实验能一次性给出科学 verdict | 全部预注册 seeds/configs、隐藏 final、三 baseline 比较、shuffle/direction/resource/retry gates、完整负结果 |
 | `PR-02F Delivery/CI` | 评审者能从冻结 evidence 独立验收结论 | machine/human report、checksums、轨迹/residual Demo、accept command 与不夸大 GPU 能力的 CI |
@@ -679,8 +694,40 @@ training seeds；HPO/formal 基础调度为 6/4 小时，含 5% 技术重试保�
 6.3/4.2 小时，总计 10.5 小时。两遍各 12 groups / 60 episodes、0 failed/extra attempts，
 独立 audits、语义顺序不变性、GPU 显示保留、`0.3.0` 验证和 checksums 全部通过；pilot report
 SHA-256 为 `47ad53c6…944cc`。其唯一权威入口仍是 `./scripts/check-pr02b-pilot`，后续代码 HEAD
-不得静默继承本次证据。PR-02C 的依赖已解除，但仍需 Owner 单独授权。详细取舍与失败账本见
+不得静默继承本次证据。PR-02C 的依赖已解除且已获 Owner 动作授权；C0 runtime/contract gate
+已实现，尚待 clean HEAD 验收且未运行训练。详细取舍与失败账本见
 [`ADR-005`](adr/0005-pr02b-pilot-data-freeze.md)。
+
+### PR-02C 授权后实施计划
+
+PR-02C 当前状态为 `c0_implemented_pending_clean_acceptance`，其唯一假设是独立 clean GPU
+runtime 能在不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，
+可复现地产生四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。它不
+裁决 action-conditioned 是否胜过 baselines；科学比较仍由 PR-02D/PR-02E 完成。
+
+实施按以下门串行推进：
+
+1. Accepted [`ADR-006`](adr/0006-pr02c-trainer-baselines.md) 已冻结 final test 延迟物化、四区间
+   variable-`Δt` residual rollout，以及 validation-group/seed 两级等权 HPO config 聚合。
+2. 独立 `learning/` package、CPython `3.10.20`/`torch==2.13.0+cu130` 精确 lock、离线
+   clean-install gate、simulator isolation、HEAD/lock/grid lineage 和 GPU reserve probe 已实现。
+   当前 dirty-tree 单元/回归/真实 GPU 诊断通过；提交后必须由 `./scripts/check-pr02c-runtime`
+   产生绑定最终 HEAD 的 clean `supported` 报告，之后才能进入第 3 步。
+3. 只生成并审计 48 train + 12 validation groups；12 个 test groups 仅消费冻结 spec，不得生成
+   数据。建立 checksum/lineage loader，并以行为测试证明 test、GT future、executed-action
+   feature、缺失 commanded action 和跨 split identity fail closed。
+4. 实现 copy-state、constant-velocity、action-free、action-conditioned 四个 arms；两个 learned
+   arms 共享 backbone、四区间 variable-`Δt` transition、参数量、updates、数据顺序、grid 和
+   seeds。
+5. 先通过 CPU tiny fixture 与宿主 GPU golden clean repeat，再运行 24 个 HPO tasks；只用
+   validation 冻结每个 learned arm 的单一 config，保留全部 trial/attempt 结果。
+6. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
+   validation-selected checkpoint、train/validation predictions、machine report 和 checksums。
+
+PR-02C 完整门包括 semantic repeat、baseline/parameter fairness、final/future isolation、
+`0.3.0` contract、资源/显示显存、retry ledger 和 atomic publication。任一门失败按
+`rejected/blocked/invalid` 保留证据，不进入 PR-02D。计划中的具体责任、任务算术和停止条件以
+ADR-006 为准。
 
 无 GitHub GPU runner 时，远端 CI 只运行 `0.3.0` contract、CPU tiny-fixture trainer smoke、
 独立 evaluator 与 mutation tests，并验证本机正式报告的 schema、checksums 和 lineage。正式
@@ -1170,5 +1217,8 @@ Owner 选择。
    `supported`，且已提交；当前尚无远端 CI 证据。
 7. PR-02B 实现与路径修复已由 `b99b5f1`、`04ddb18` 提交；代码承载 SHA `04ddb18` 的 clean
    `./scripts/check-pr02b-pilot` 已完整 `supported`，两遍 source、独立 audits、GPU reserve、
-   21 项 freeze verification 与 checksums 均通过。PR-02B 已关闭；下一步是由 Owner 单独授权
-   PR-02C Trainer/Baselines，授权前不得创建 `learning/` 或运行训练。
+   21 项 freeze verification 与 checksums 均通过。PR-02B 已关闭。
+8. Owner 已单独授权 PR-02C；ADR-006 的 final test 延迟物化、四评分区间 variable-`Δt`
+   rollout 与 HPO 两级等权聚合均已冻结。C0 runtime/contract gate 已实现，状态为
+   `c0_implemented_pending_clean_acceptance`；下一步是提交后运行 clean gate，C0 `supported`
+   前不进入 loader/C1。当前没有 trainer、checkpoint 或模型性能证据。

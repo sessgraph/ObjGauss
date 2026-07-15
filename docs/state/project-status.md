@@ -25,9 +25,8 @@ guard 已实现。正式 spec 不硬编码提交，而由运行时注入当前 c
 attempts；独立 audit、1210-entry checksum index 与 Delivery verifier 均为 `supported`，source
 commit 与 HEAD 一致。该 SHA 的 PR-00、runtime、writer、independent audit、frozen cohort 与
 acceptance delivery 六项远端 Actions 全部成功。任何后续 `main` HEAD 若未保持这些门成功，
-PR-01 状态自动重开。
-模型、训练、Gaussian dynamics、外部数据、
-RGB/GPU renderer 和机器人控制均未实现。
+PR-01 状态自动重开。PR-02C C0 之外的模型、训练、Gaussian dynamics、外部数据、RGB/GPU
+renderer 和机器人控制均未实现。
 
 PR-02 的主要预注册决策已经完成：唯一 primary endpoint 是 held-out sibling groups 上 target
 object 的多步 `effect-vs-hold` ObjectState error；使用全新隔离 ManiSkill cohort、最小 Object
@@ -50,5 +49,16 @@ extra attempts，两份独立 source audit、跨顺序语义一致性、GPU 1 Gi
 verification 与 evidence checksums 均为 `supported`。权威 pilot report SHA-256 为
 `47ad53c6…944cc`，冻结 48/12/12 formal groups、3 seeds、`δ=0.1`、`δ_shuffle=0.06` 和含 5%
 retry reserve 的 10.5 GPU-hours 调度。当前状态为 `committed_local_supported`，尚无远端 CI
-证据。PR-02C 的前置依赖已满足但尚未授权；`learning/`、trainer、checkpoint、模型指标、
-Gaussian dynamics 和机器人控制仍未实现。
+证据。PR-02C 的前置依赖已满足，Owner 已于 2026-07-15 单独授权；accepted
+ADR-006 已定义 runtime/data/model/ledger 边界、24 个 HPO tasks、6 个 formal training tasks、
+golden repeat 和停止条件。Owner 已选择延迟物化 final test：PR-02C 只生成 48 train + 12
+validation groups，12 个 test groups 到 PR-02E 前仅保留冻结 spec；learned rollout 复用四个
+评分区间的 variable-`Δt` residual transition，只读取 commanded-action schedule；HPO config
+按 12 validation groups group-first 后对全部 3 seeds 等权平均，缺失 seed 的 config 不可入选。
+ADR-006 已 accepted。C0 已建立独立 `learning/` package、精确 `uv.lock`、纯 PyTorch 离线
+runtime、simulator isolation、clean HEAD/lock/grid lineage guard、12 GiB cap/1 GiB display
+reserve probe、独立 verifier 和失败语义。12 个 Python 测试、4 个 Node freeze 测试与全库
+Node 门已在 dirty 开发树通过，真实 RTX 5060 Ti 诊断 probe 满足精确 CUDA runtime 和显示显存
+保留；因尚未提交，clean gate 按设计拒绝 dirty worktree，故当前状态是
+`c0_implemented_pending_clean_acceptance`。C0 `supported` 前不进入 loader/C1；formal cohort、
+模型、trainer、checkpoint、模型指标、Gaussian dynamics 和机器人控制仍未实现。
