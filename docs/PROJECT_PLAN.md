@@ -1,9 +1,9 @@
 # ObjGauss 假设驱动实施路径
 
-> 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；PR-01 implementation HEAD 的 clean 一键验收
-> 已本地支持，最终提交 SHA 的远端 CI 待运行
-> 版本：0.13
-> 日期：2026-07-14
+> 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；代码承载验收 SHA `234ba00` 的 clean 一键验收
+> 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭
+> 版本：0.14
+> 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
 > 知识状态：
@@ -47,7 +47,8 @@
 >   `synthetic-audit-v0`，不下载外部数据，也不读取旧归档。
 > - `confirmed_fact`：`PR-00` 由提交 `b4107fa` 固化；本地 `npm run check` verdict 为
 >   `supported`，36 个 primary points 的最大重投影误差为 `1.005e-14 px`，资源/lineage 与
->   14 类预注册负例通过。远端 CI 尚未运行，下游假设也未因此支持。
+>   14 类预注册负例通过；代码承载验收 SHA `234ba00` 的 PR-00 远端 check 也已成功。下游假设
+>   未因此支持。
 > - `confirmed_fact`：ManiSkill `3.0.1` 的官方 release、PyPI wheel/hash、许可、snapshot/reset
 >   和平台要求已由 RES-001 核验。CPython 3.12 的 `A-0` 因 `toppra` 无匹配 wheel 在解析阶段
 >   失败；CPython 3.10.20 的 `A-1` 已通过安装、import 和宿主 GPU probe。Snapshot pilot 的
@@ -67,10 +68,10 @@
 > - `working_assumption`：HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
 >   模型家族和未冻结数值阈值；`RES-001` 可以用更合适的获批来源替换。
 > - 当前本地实现包括 Stage-0、`PR-00`、独立 RES-001 snapshot audit tool、PR-01 primitive
->   sibling action/contact gate 与 PR-01A–F contract/runtime/writer/audit/cohort/Delivery；PR-01A–F
->   已由 `71d4e39` 提交并在该 clean HEAD 上完整验收为 `supported`。本文不表示
->   远端 CI、完整 PR-01 关闭或模型已实现，也不表示
->   `PR-01`–`PR-11` 已创建、提交或通过。
+>   sibling action/contact gate 与 PR-01A–F contract/runtime/writer/audit/cohort/Delivery；代码
+>   承载验收 SHA `234ba00` 已在 clean HEAD 上完整验收，且六项远端 Actions 全部成功，PR-01
+>   里程碑关闭。本文不表示模型已实现，也不表示
+>   `PR-02`–`PR-11` 已创建、提交或通过。
 
 ## 1. 路径结论
 
@@ -326,24 +327,27 @@ point 的 2D Euclidean pixel error，并取最大值。Manifest 中的 primary p
   executed ledger、final physical state 和 contact trace 均逐项可复现；四个 push 的 paired
   主轴位移越过运行前冻结的 `0.005 m` 门，110-step contact/settling checks 通过。该结果把
   ManiSkill 提升为 `approved_pr01_primitive_cpu_push_source`，不等于完整 PR-01 已通过。
-- PR-01B production runtime 本地门为 `supported`：`sim/uv.lock` 固定 103 个解析条目，外部依赖
+- PR-01B production runtime 门为 `supported`：`sim/uv.lock` 固定 103 个解析条目，外部依赖
   从全新临时 venv 经 wheel-only 门安装；10 个 runtime 行为测试与 canonical/reverse 两个真实
-  offline 进程通过，稳定 evidence SHA-256 为 `8a2013f1…71cb0`。远端 CI 尚未运行。
+  offline 进程通过，稳定 evidence SHA-256 为 `8a2013f1…71cb0`；`234ba00` 的远端 runtime smoke
+  成功。
 - PR-01C writer 本地门为 `supported`：22 个 Python 行为/负例测试通过，真实 canonical/reverse golden
   group 在同一 clean source 下得到相同 evidence SHA-256；该 digest 纳入 source commit/tree lineage，
   不作为跨提交常量。五个 branch 各有 111 条 trajectory 与 110 条 contact records。该结果只支持
   单 group 原子幂等发布。
-- PR-01D independent audit 本地门为 `supported`：重新生成真实 golden group 后，14 个 hard
-  gates 与 11 个 mutation cases 全部通过；该切片不替代正式 cohort 或远端 CI。
+- PR-01D independent audit 门为 `supported`：重新生成真实 golden group 后，14 个 hard
+  gates 与 11 个 mutation cases 全部通过；`234ba00` 的远端 independent audit 成功。该切片
+  不替代正式 cohort。
 - PR-01E formal cohort 本地门为 `supported`：保留 provisional threshold rejection 后，冻结
   preflight 与正式 48 groups / 240 episodes 全部通过；split 为 24/12/12，0 failed/extra attempts，
   最近一次正式运行在 126.24 秒、41,403,093 bytes 与 808,157,184 bytes RSS 内通过独立 audit。
   单次 audit report 含运行时 attempt/index hashes，不作为跨运行常量。
 - PR-01F Delivery 已实现无 RGB 五联状态回放、机器/人类报告、全量 checksum、`accept-pr01` 和
   GitHub Actions job。正式 spec 记录 runtime source-commit policy，运行时注入当前 HEAD；builder、
-  verifier 与入口都会拒绝 dirty checkout。PR-01A–F 已由 `71d4e39` 提交；该 clean HEAD 的
+  verifier 与入口都会拒绝 dirty checkout。代码承载验收 SHA `234ba00` 的 clean HEAD
   `accept-pr01` 重建 48 groups / 240 episodes、24/12/12 split、0 failed/extra attempts，独立 audit、
-  1210-entry checksum index 与 Delivery verifier 均为 `supported`。最终提交 SHA 的远端 CI 尚未完成。
+  1210-entry checksum index 与 Delivery verifier 均为 `supported`；该 SHA 的六项远端 Actions
+  全部成功，PR-01 里程碑关闭。
 - 已确认的负边界：`reset_to_env_states` 只恢复 physical state，不恢复 ManiSkill RNG；PR-01
   adapter 必须显式 capture/restore main/episode RNG 并把它纳入 snapshot hash。
   Rendering、外部 asset、demo 和 dataset 不在该授权内；具体 guardrail 和本机容量快照只在
@@ -928,5 +932,5 @@ Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的
    CPython 3.10.20 的 `A-1` 已通过安装、import、宿主 GPU probe、freeze、磁盘和空资产检查。
 4. Snapshot/RNG fork 与 programmatic CPU primitive action/contact gate 都已用两个独立进程
    `supported`；后者只批准 PR-01 primitive push source。
-5. PR-01A–F 已由实现提交 `71d4e39` 固化；当前最终 clean HEAD 的 `accept-pr01` 已完整
-   `supported`。下一步需取得 push 授权，由相同最终 SHA 的远端 CI 裁决完成门。
+5. PR-01A–F 的代码承载验收 SHA `234ba00` 已由 clean `accept-pr01` 完整 `supported`，同一 SHA
+   的六项远端 Actions 全部成功。PR-01 门已关闭，下一阶段按队列进入 PR-02 的独立决策与预注册。

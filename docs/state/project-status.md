@@ -1,11 +1,11 @@
 # 项目当前状态
 
 > 动态事实摘要；需求见 [`../PRD.md`](../PRD.md)，资源事实见 [`../../REFERENCES.md`](../../REFERENCES.md)。
-> 日期：2026-07-14
+> 日期：2026-07-15
 
-当前处于 PR-01 严格成对干预里程碑。Stage-0 与 PR-00 已本地提交；ManiSkill `3.0.1` 的
+PR-01 严格成对干预里程碑已关闭。Stage-0 与 PR-00 已提交；ManiSkill `3.0.1` 的
 snapshot/RNG 和程序化 CPU primitive action/contact source gates 已本地支持，但相关脚本和文档
-现已随 PR-01A–F 由提交 `71d4e39` 固化。
+最初随 PR-01A–F 由提交 `71d4e39` 固化，最终代码承载验收 SHA 为 `234ba00`。
 
 Owner 已确定 PR-01 使用 `0.2.0` episode/experiment/attempt/invariance-report 四层 contract、
 隔离 `sim` production optional extra，以及无 RGB 五联状态回放。里程碑内部按 PR-01A–F 推进，
@@ -20,9 +20,11 @@ threshold rejection 后完成冻结 preflight，并以
 48 groups / 240 episodes、24/12/12 split、0 failed/extra attempts 通过正式独立审计。
 
 PR-01F 的五联无 RGB Demo、Delivery report/checksums、`accept-pr01`、CI job 与 clean-head lineage
-guard 已实现。正式 spec 不再硬编码旧提交，而由运行时注入当前 clean HEAD。实现提交 `71d4e39`
-的 clean `accept-pr01` 已重建 48 groups / 240 episodes、24/12/12 split、0 failed/extra attempts；
-独立 audit、1210-entry checksum index 与 Delivery verifier 均为 `supported`，source commit 与 HEAD
-一致。A–F 均未运行远端 CI，PR-01 仍未关闭；当前只剩相同最终 SHA 的远端 CI 门。
+guard 已实现。正式 spec 不硬编码提交，而由运行时注入当前 clean HEAD。代码承载验收 SHA
+`234ba00` 的 clean `accept-pr01` 已重建 48 groups / 240 episodes、24/12/12 split、0 failed/extra
+attempts；独立 audit、1210-entry checksum index 与 Delivery verifier 均为 `supported`，source
+commit 与 HEAD 一致。该 SHA 的 PR-00、runtime、writer、independent audit、frozen cohort 与
+acceptance delivery 六项远端 Actions 全部成功。任何后续 `main` HEAD 若未保持这些门成功，
+PR-01 状态自动重开。
 模型、训练、Gaussian dynamics、外部数据、
 RGB/GPU renderer 和机器人控制均未实现。

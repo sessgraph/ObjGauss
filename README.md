@@ -5,11 +5,12 @@
 裁决。后续 `RES-001` 在固定 ManiSkill 3.0.1 runtime 上支持了无渲染 snapshot fork，并由
 `PR-01` 首个 action/contact gate 支持了程序化 CPU primitive push sibling source；完整
 里程碑现按 `PR-01A`–`PR-01F` 推进。`0.2.0` sibling evidence contract、隔离 production
-runtime、原子 adapter/writer、independent audit 与冻结 cohort 均已在本地门支持；无 RGB
-Delivery、checksums 与一键命令也已实现，并会在 dirty worktree 上 fail closed。PR-01A–F 已由
-实现提交 `71d4e39` 固化，并在该 clean HEAD 上由 `./scripts/accept-pr01` 完整重建为
-`supported`；当前只缺最终提交 SHA 的远端 CI，不能把 PR-01 标为关闭。robot controller、RGB/GPU
-renderer 和训练仍未实现。项目保持
+runtime、原子 adapter/writer、independent audit 与冻结 cohort 均已支持；无 RGB Delivery、
+checksums 与一键命令也已实现，并会在 dirty worktree 上 fail closed。代码承载验收 SHA
+`234ba00` 已由 `./scripts/accept-pr01` 完整重建为 `supported`，且该 SHA 的 PR-00、runtime、
+writer、independent audit、frozen cohort 与 acceptance delivery 六项远端 Actions 全部成功，
+因此 PR-01 严格 sibling evidence 里程碑已关闭。robot controller、RGB/GPU renderer 和训练仍未
+实现。项目保持
 私有并按 all rights reserved 管理，对外发布前必须重新决策许可证。
 
 `PR-00` 当前本地机器结果为 `supported`：JSON Schema Draft 2020-12 contract、资源 checksum、
@@ -140,7 +141,7 @@ ManiSkill/SAPIEN/Torch 只存在于 `sim` package 的 `runtime` optional extra�
 `8a2013f1c8af839ad47f038b6bf3df8306191114cd4e23c1434779c84b571cb0`，reverse verdict 为
 `supported`。报告位于 ignored `generated/pr01b/`；本结果只支持可复现、无渲染、无外部资产的
 `physx_cpu` 五分支 runtime，不表示 writer、独立 audit、正式 cohort 或完整 PR-01 已完成。
-GitHub runtime workflow 已建立但尚未在远端运行，本地结果不能替代最终 commit SHA 的 CI。
+代码承载验收 SHA `234ba00` 的 GitHub runtime workflow 已成功；该远端证据不扩大本切片声明。
 
 ## 验证 PR-01C 原子 Writer
 
@@ -157,7 +158,7 @@ PR-01C 把真实五分支 simulator 输出映射为 `0.2.0` episode/attempt，�
 records；canonical/reverse 在同一 clean source 下得到相同 evidence SHA-256。该 digest 纳入
 source commit/tree lineage，因此不作为跨提交常量。这只支持单一 golden group 的 adapter、原子
 幂等 writer 与 attempt failure semantics；独立 auditor、正式 cohort 与 Delivery 的结论由后续
-切片各自提供，远端 CI 和完整 PR-01 关闭仍未完成。
+切片各自提供。代码承载验收 SHA `234ba00` 的远端 writer job 已成功。
 
 ## 验证 PR-01D 独立审计
 
@@ -172,7 +173,8 @@ attempt 与 publication 重新计算 14 个 hard gates，并以固定 `0/1/2/3/4
 
 当前 14 个 baseline gates 与 11 个 mutation cases 全部通过。Machine report 含运行生成的
 attempt/index hashes，因此不把单次运行 SHA 伪装成跨运行常量。本结果只支持这个
-golden fixture 的证据可独立审计；该段本身不替代后续 cohort、最终 lineage、远端 CI 或完整 PR-01。
+golden fixture 的证据可独立审计；该段本身不替代后续 cohort、最终 lineage 或完整 PR-01。
+代码承载验收 SHA `234ba00` 的远端 independent audit job 已成功。
 
 ## 验证 PR-01E Preflight 与正式 Cohort
 
@@ -190,7 +192,8 @@ threshold 正确拒绝了 `box-b` weak push，失败证据被保留且没有重�
 `supported`。Active spec SHA-256 为 `d1dff647…b339ef`，manifest SHA-256 为
 `c0dc325c…dc7ef`；阈值测量时的 `fdab5f78…c8623` spec 作为历史 fixture 保留，机器测试证明两者
 只在 source-commit provenance 策略上不同。数据与运行输出只在 ignored `generated/pr01e/`，
-不进入 Git；实现提交 `71d4e39` 的 clean 验收已把运行证据绑定到该 HEAD，远端 CI 仍未完成。
+不进入 Git；代码承载验收 SHA `234ba00` 的 clean 验收与远端 frozen cohort job 均已
+`supported`，运行证据绑定该 HEAD。
 
 ## 完成 PR-01F Delivery 验收
 
@@ -213,10 +216,11 @@ python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
 随后打开 <http://127.0.0.1:8000/artifacts/pr01/demo/>。当前五联页面与 fail-closed checksum/audit
-行为已通过本地测试和浏览器目视核对。实现提交 `71d4e39` 的 clean 一键验收得到 48 groups /
-240 episodes、24/12/12 split、0 failed/extra attempts、独立 audit `supported`，并生成含 1210 个
-条目的 checksum index；Delivery 的 source commit 与该 HEAD 一致。最终提交 SHA 的远端 GitHub
-Actions 仍未运行，因此 PR-01F 尚未完成远端门，PR-01 也尚未关闭。
+行为已通过本地测试和浏览器目视核对。代码承载验收 SHA `234ba00` 的 clean 一键验收得到
+48 groups / 240 episodes、24/12/12 split、0 failed/extra attempts、独立 audit `supported`，并生成
+含 1210 个条目的 checksum index；Delivery 的 source commit 与该 HEAD 一致。该 SHA 的六项
+GitHub Actions 全部成功，PR-01F 与完整 PR-01 远端门已关闭；任何后续 `main` HEAD 若未保持
+这些门成功，状态自动重开。
 
 ## 项目事实源
 

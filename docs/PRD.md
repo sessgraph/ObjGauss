@@ -1,12 +1,13 @@
 # ObjGauss 对象中心 Gaussian 世界模型 PRD
 
-> 状态：Draft；`PR-00` 已固化，PR-01 source gate 与 `PR-01A`–`PR-01F` 已提交并在 clean
-> implementation HEAD 本地支持；最终提交 SHA 的远端 CI 待运行
-> 版本：0.11
-> 日期：2026-07-14
+> 状态：Draft；`PR-00` 已固化，PR-01 source gate 与 `PR-01A`–`PR-01F` 已提交；代码承载
+> 验收 SHA `234ba00` 的本地完整门与六项远端 Actions 均为 `supported`
+> 版本：0.12
+> 日期：2026-07-15
 > 当前验收范围：文档、Stage-0 本地预览、`PR-00` synthetic contract 证据与无渲染 primitive
-> sibling action/contact pilot、`0.2.0` contract、隔离 production runtime、原子 writer、独立 audit、冻结 formal cohort 与无 RGB Delivery；不表示完整 PR-01 已关闭，也不包含模型、原始训练数据或
-> 下游研究结论
+> sibling action/contact pilot、`0.2.0` contract、隔离 production runtime、原子 writer、独立
+> audit、冻结 formal cohort 与无 RGB Delivery；PR-01 严格 sibling evidence 里程碑已关闭，但不
+> 包含模型、原始训练数据或下游研究结论
 >
 > 知识状态：“一个实现 PR 只引入一个可证伪假设”、`PR-04` Gaussian 生死门，以及
 > “面向研究评审的 Demo A 是首个验收目标”已经由 Owner 确认为 `decision`；`PR-04` 的
@@ -23,7 +24,8 @@
 > Owner 已完成 `PR-00` Decision Freeze。当前本地实现使用唯一 JSON Schema `0.1.0`、固定
 > `synthetic-audit-v0`、独立 evaluator 与 Web consumer，在 36 个 primary points 上得到
 > `max_camera_reprojection_error_px = 1.005e-14 < 1.0` 的 `supported` 窄裁决；它不支持真实
-> 数据、Gaussian 重建、世界模型、动力学或规划价值声明；提交尚未 push，远端 CI 也未运行。
+> 数据、Gaussian 重建、世界模型、动力学或规划价值声明；代码承载验收 SHA `234ba00` 的
+> PR-00 远端 check 已成功。
 > 固定 ManiSkill 3.0.1 的 CPU/no-render primitive pilot 进一步支持了同 snapshot/RNG 的五个
 > external-force sibling action/contact outcomes，并通过相反 branch 顺序的独立进程复跑；它只
 > 批准 PR-01 primitive push source，不代表 robot controller、renderer/GPU 或完整 PR-01 已实现。
@@ -33,7 +35,7 @@
 > 隔离 `sim` optional extra，Demo 使用无 RGB 五联状态回放。完整决策见 ADR-003。
 > PR-01B 已用精确 uv lock 从全新临时 venv 完成 wheel-only 外部依赖安装，并在显式 offline、
 > 空只读 asset 门下由 canonical/reverse 两个真实进程得到一致五分支 evidence；这只支持
-> production runtime 可复现。远端 CI 尚未运行。
+> production runtime 可复现。代码承载验收 SHA `234ba00` 的远端 runtime smoke 已成功。
 > PR-01C 已由真实 canonical/reverse 进程生成语义一致的五分支 golden group，并通过原子发布、
 > 幂等 replay、冲突拒绝、失败 attempt 与非有限值负例；这只支持单 group writer，后续
 > audit、正式 cohort 与 Delivery 仍由各自切片独立裁决。
@@ -41,12 +43,12 @@
 > mutation 命中稳定四态与 reason code；这只支持审计器及 fixture，不表示 preflight、正式
 > cohort 或最终交付已完成。
 > PR-01E 已保留一次 provisional effect threshold rejection，再用 preflight 冻结阈值与资源预算；
-> 正式 48 groups / 240 episodes、24/12/12 split、零额外 attempt 通过独立审计。该结果仍不表示
-> 远端 CI、因果模型理解或 Gaussian dynamics 已完成。
+> 正式 48 groups / 240 episodes、24/12/12 split、零额外 attempt 通过独立审计，且该 SHA 的
+> frozen cohort 远端门成功。该结果仍不表示因果模型理解或 Gaussian dynamics 已完成。
 > PR-01F 的五联状态 Demo、Delivery report/checksums、clean-checkout guard 与 `accept-pr01` 已实现；
-> source commit 在运行时绑定当前 clean HEAD，不能在冻结 spec 中自引用。PR-01A–F 已由实现提交
-> `71d4e39` 固化；该 clean HEAD 的一键验收重建 48 groups / 240 episodes、0 failed/extra attempts，
-> 独立 audit 与 Delivery verifier 均为 `supported`。最终提交 SHA 的远端 CI 尚未运行。
+> source commit 在运行时绑定当前 clean HEAD，不能在冻结 spec 中自引用。代码承载验收 SHA
+> `234ba00` 的一键验收重建 48 groups / 240 episodes、0 failed/extra attempts，独立 audit 与
+> Delivery verifier 均为 `supported`；该 SHA 的六项远端 Actions 全部成功，PR-01 里程碑关闭。
 > 归档事实和候选资源状态由 [`../REFERENCES.md`](../REFERENCES.md) 统一维护。
 
 ## 1. 决策摘要
