@@ -1,0 +1,30 @@
+{
+  "fixture_id": "pr02b-pilot-inputs-v0",
+  "fixture_kind": "objgauss.pr02b-pilot-input-manifest",
+  "inputs": [
+    {
+      "path": "contracts/fixtures/pr02b/pilot-spec.json",
+      "sha256": "5a4be3ac36925ce8af47920802c8c5c67a01efa89511c623d3427d123a9548de"
+    },
+    {
+      "path": "contracts/fixtures/pr02b/source-experiment.json",
+      "sha256": "4351b630c858db1d80a60dc6d8d3b498c039e996e4991b2ae38b97440042f0a2"
+    },
+    {
+      "path": "contracts/fixtures/pr02b/hyperparameter-grid.json",
+      "sha256": "f95e34a47cf624f7f8dc6cdcc4c159aa4eb7cb9f8354f86bfbed4158d79a51be"
+    },
+    {
+      "path": "sim/uv.lock",
+      "sha256": "69d3b8c1ede6e2839b1b0bfd8cdcee5eb657aa0e60f525cfa4726e359f47a52e"
+    }
+  ],
+  "pilot_exclusion": {
+    "pr01_experiment_id": "pr01e-primitive-cohort-v0",
+    "pr02b_experiment_id": "pr02b-calibration-v0",
+    "ids_disjoint": true,
+    "seeds_disjoint": true,
+    "excluded_from_training": true,
+    "excluded_from_final_statistics": true
+  }
+}

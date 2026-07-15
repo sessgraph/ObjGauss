@@ -15,6 +15,7 @@
     "test:preview": "node --test tests/external/gaussian-preview.test.mjs",
     "test:pr01d": "node --test tests/pr01d-audit.test.mjs",
     "test:pr01f": "node --test tests/pr01f-delivery.test.mjs",
+    "test:pr02b": "node --test tests/pr02b-pilot.test.mjs",
     "test": "node --test tests/*.test.mjs",
     "syntax": "node scripts/check-syntax.mjs",
     "verify:pr01f": "node scripts/verify-pr01-delivery.mjs",

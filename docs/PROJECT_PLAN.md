@@ -2,8 +2,9 @@
 
 > 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；代码承载验收 SHA `234ba00` 的 clean 一键验收
 > 与六项远端 Actions 均为 `supported`，PR-01 里程碑关闭；PR-02A 已本地实现、通过项目门并
-> 提交，但尚未取得远端 CI 证据
-> 版本：0.16
+> 提交，但尚未取得远端 CI 证据；PR-02B 已获授权并完成实现与非最终排障 pilot，clean
+> acceptance 仍须在提交后的同一 HEAD 重跑
+> 版本：0.17
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -81,6 +82,11 @@
 > - `confirmed_fact`：PR-02A 已建立 7 个 `0.3.0` schema 文件和 6 种精确分派记录；5 个旧
 >   contract 哈希、6 个正向 fixtures 与 39 个负例均通过，本地 machine report 为 `supported`，
 >   SHA-256 为 `3b1e64a0…acccca3f`。这不支持 pilot、数据、模型或指标声明。
+> - `confirmed_fact`：Owner 已授权 PR-02B；当前实现含隔离 canonical/reverse source pilot、
+>   独立 source audit、calibration/power freeze、有限 GNN grid、GPU 显示保留探针与 clean-head
+>   verifier。Dirty diagnostic 已修复并保留一次 source rejection 与一次量纲错误的 blocked
+>   结果，修正版非最终 evidence 为 supported；提交后的 clean acceptance 尚未运行，不能据此
+>   关闭 PR-02B 或开始 PR-02C。
 > - `decision`：`PR-04` 的唯一 primary endpoint 是 held-out sibling groups 上的多步
 >   `effect-vs-hold` ObjectState 预测误差。
 > - `decision`：该 endpoint 使用 group-first paired aggregation；每个 sibling group 等权，
@@ -665,6 +671,15 @@ future leakage、split、attempt 或执行协议损坏是 `invalid`。
 六片严格串行；任何前置切片为 `rejected`、`blocked` 或 `invalid` 时不得通过补写 Delivery 或
 放宽后续门继续推进。
 
+PR-02B 当前实现状态为 `implemented_pending_clean_acceptance`。非最终排障 pilot 已在不改变
+既有 `0.0014 m` source threshold 的前提下冻结候选值：horizon `1.1 s`，评分点
+`[0.1, 0.2, 0.5, 1.1] s`，`δ=0.1`，`δ_shuffle=0.06`，正式 48/12/12 groups 和 3 个
+training seeds；HPO/formal 基础调度为 6/4 小时，含 5% 技术重试保留后的硬调度为
+6.3/4.2 小时，总计 10.5 小时。其唯一权威入口是
+`./scripts/check-pr02b-pilot`，要求 clean checkout 并绑定当前 HEAD。当前工作区仍有未提交实现，
+所以这些只是 diagnostic freeze candidate，PR-02C 继续阻塞。详细取舍与失败账本见
+[`ADR-005`](adr/0005-pr02b-pilot-data-freeze.md)。
+
 无 GitHub GPU runner 时，远端 CI 只运行 `0.3.0` contract、CPU tiny-fixture trainer smoke、
 独立 evaluator 与 mutation tests，并验证本机正式报告的 schema、checksums 和 lineage。正式
 GPU experiment 由已授权宿主按冻结规格运行；CI 状态与科学 verdict 分账，远端不得声称已经
@@ -1150,5 +1165,8 @@ Owner 选择。
 5. PR-01A–F 的代码承载验收 SHA `234ba00` 已由 clean `accept-pr01` 完整 `supported`，同一 SHA
    的六项远端 Actions 全部成功，PR-01 门已关闭。
 6. PR-02A Contract 已在本地实现并由 `npm run contract:pr02a` 与 `npm run check` 得到
-   `supported`，且已提交；当前尚无远端 CI 证据。下一步 PR-02B pilot/data freeze 仍需独立
-   动作授权。
+   `supported`，且已提交；当前尚无远端 CI 证据。
+7. PR-02B 已获动作授权并完成实现与 dirty-worktree diagnostic；两份修正版 source audit、
+   GPU 1 GiB 显示保留探针和 freeze verifier 均通过，但该结果不满足 clean-head lineage。
+   下一步是在 Owner 授权提交后，于该 clean HEAD 运行 `./scripts/check-pr02b-pilot`；只有完整
+   evidence supported 才能关闭 PR-02B，PR-02C 仍不得开始。

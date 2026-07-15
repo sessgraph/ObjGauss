@@ -1,0 +1,54 @@
+{
+  "grid_version": "0.1.0",
+  "grid_kind": "objgauss.pr02-minimal-object-gnn-grid",
+  "runtime": {
+    "python": "3.10.20",
+    "framework": "pytorch",
+    "torch": "2.13.0+cu130",
+    "cuda": "13.0",
+    "dependency_policy": "pure-pytorch-no-pyg-lightning-hydra"
+  },
+  "architecture": {
+    "model_family": "minimal-object-gnn",
+    "message_passing_rounds": 1,
+    "object_encoder_layers": 2,
+    "pairwise_message_layers": 2,
+    "shared_update_head_layers": 2,
+    "aggregation": "mean",
+    "activation": "silu",
+    "residual_prediction": true,
+    "action_injection": "target-object-only",
+    "action_free_mask_token": "learned-fixed-mask-token",
+    "hidden_width": [64, 128]
+  },
+  "optimization": {
+    "optimizer": "adamw",
+    "learning_rate": [0.001, 0.0003],
+    "weight_decay": [0.00001],
+    "batch_size": [64],
+    "gradient_clip_norm": 1.0,
+    "optimizer_updates_max": 20000,
+    "epochs_max": 200,
+    "early_stopping_patience_epochs": 20,
+    "checkpoint_selection": "minimum-validation-primary-error-per-seed"
+  },
+  "rollout": {
+    "teacher_forcing": "initial-state-only",
+    "loss": "normalized-open-loop-branch-rollout",
+    "commanded_action_feature": true,
+    "executed_action_feature": false
+  },
+  "search": {
+    "configuration_count": 4,
+    "same_grid_for_action_free_and_action_conditioned": true,
+    "adaptive_expansion_allowed": false,
+    "final_test_visible": false
+  },
+  "per_task_limits": {
+    "hpo_wall_seconds_max": 900,
+    "formal_wall_seconds_max": 2400,
+    "peak_vram_bytes_max": 12884901888,
+    "display_vram_reserve_bytes_min": 1073741824,
+    "max_attempts": 2
+  }
+}

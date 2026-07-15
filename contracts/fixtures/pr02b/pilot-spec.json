@@ -1,0 +1,101 @@
+{
+  "spec_version": "0.1.0",
+  "spec_kind": "objgauss.pr02b-pilot-spec",
+  "experiment_id": "pr02b-calibration-v0",
+  "fixture_id": "pr02b-pilot-v0",
+  "source_commit_policy": "runtime-current-clean-git-head",
+  "asset_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "object_specs": {
+    "pr02b-cal-object-a": {
+      "half_size_m": [0.028, 0.021, 0.025],
+      "density_kg_m3": 520.0,
+      "symmetry": {
+        "kind": "finite_wxyz",
+        "rotations": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+      }
+    },
+    "pr02b-cal-object-b": {
+      "half_size_m": [0.024, 0.029, 0.022],
+      "density_kg_m3": 470.0,
+      "symmetry": {
+        "kind": "finite_wxyz",
+        "rotations": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+      }
+    }
+  },
+  "layouts": {
+    "pr02b-cal-layout-a": { "context_xy_m": [0.48, 0.52] },
+    "pr02b-cal-layout-b": { "context_xy_m": [-0.52, 0.48] }
+  },
+  "start_poses": {
+    "pr02b-cal-start-a": { "target_base_xy_m": [0.04, -0.03], "target_jitter_m": 0.018 }
+  },
+  "formal_reset_seeds": [26071501, 26071502, 26071503, 26071504],
+  "preflight_reset_seeds": [26071601, 26071602, 26071603],
+  "preflight_start_pose_ids": ["pr02b-cal-start-a"],
+  "split_algorithm": "sha256-seed-rank-v1",
+  "split_allocation": { "train": 2, "validation": 1, "test": 1 },
+  "thresholds": {
+    "hold_horizontal_drift_max_m": 0.002,
+    "directional_effect_min_m": 0.0014,
+    "strong_over_weak_min_m": 0.005,
+    "final_linear_speed_max_m_s": 0.01,
+    "final_angular_speed_max_rad_s": 0.01
+  },
+  "calibration": {
+    "repeat_orders": ["canonical", "reverse"],
+    "hold_branch": "hold",
+    "effect_branches": ["push-pos-x-weak", "push-pos-x-strong", "push-neg-x-weak", "push-pos-y-weak"],
+    "direction_gate_branches": ["push-pos-x-weak", "push-neg-x-weak"],
+    "horizon_duration_s": 1.1,
+    "scoring_times_s": [0.1, 0.2, 0.5, 1.1],
+    "robust_scale_quantile": 0.75,
+    "evaluator_noise_quantile": 0.95,
+    "scale_epsilon": {
+      "position": 0.000001,
+      "orientation": 0.000001,
+      "linear_velocity": 0.00001,
+      "angular_velocity": 0.00001
+    }
+  },
+  "power": {
+    "method": "normal-approximation-over-group-and-bootstrap-seed-proxy",
+    "target_power": 0.8,
+    "confidence_level": 0.95,
+    "alternative_multiplier_over_delta": 2.0,
+    "candidate_test_group_counts": [12, 24, 48, 72],
+    "candidate_training_seed_counts": [3, 5, 7],
+    "training_seed_values": [2026071501, 2026071502, 2026071503, 2026071504, 2026071505, 2026071506, 2026071507],
+    "proxy_bootstrap_replicates": 512,
+    "proxy_bootstrap_seed": 2026071599,
+    "delta_formula": "clamp(0.10*median_normalized_effect,0.05,0.10)",
+    "delta_shuffle_formula": "max(0.03,0.60*delta)",
+    "train_to_test_group_ratio": 4,
+    "validation_to_test_group_ratio": 1
+  },
+  "formal_design": {
+    "objects_per_split": { "train": 4, "validation": 2, "test": 2 },
+    "layouts_per_split": { "train": 3, "validation": 3, "test": 3 },
+    "starts_per_split": { "train": 1, "validation": 1, "test": 1 },
+    "object_shape_family": "distinct-axis-programmatic-cuboid",
+    "object_symmetry": "explicit-d2-finite-wxyz",
+    "action_support": "same-five-branch-support-in-every-split",
+    "group_id_algorithm": "explicit-object-layout-start-seed-product-v1"
+  },
+  "budgets": {
+    "gpu_hours_total_max": 24,
+    "gpu_hours_pilot_hpo_max": 8,
+    "gpu_hours_formal_max": 16,
+    "training_peak_vram_bytes_max": 12884901888,
+    "display_vram_reserve_bytes_min": 1073741824,
+    "cohort_cpu_wall_hours_max": 8,
+    "artifact_bytes_max": 107374182400,
+    "pilot_wall_seconds_max": 900,
+    "pilot_artifact_bytes_max": 67108864,
+    "pilot_process_rss_bytes_max": 8589934592
+  },
+  "claim_boundary": {
+    "allows": ["pr02-pilot-data-and-statistical-design-freeze"],
+    "forbids": ["trained-model-performance", "gaussian-dynamics", "external-data-generalization", "robot-control"]
+  }
+}

@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_ROOT="$ROOT/sim"
+OUTPUT_ROOT="$ROOT/generated/pr02b"
+cd "$ROOT"
+
+if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+  printf 'blocked: PR-02B freeze requires a clean checkout\n' >&2
+  exit 3
+fi
+
+if [[ -n "${OBJGAUSS_NODE:-}" ]]; then
+  NODE_BIN="$OBJGAUSS_NODE"
+elif [[ "$(node --version 2>/dev/null || true)" == "v24.18.0" ]]; then
+  NODE_BIN="$(command -v node)"
+elif [[ -x "$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node" ]]; then
+  NODE_BIN="$ROOT/data/res001/node-v24.18.0/node_modules/node/bin/node"
+else
+  printf 'blocked: Node v24.18.0 is unavailable\n' >&2
+  exit 3
+fi
+
+if [[ "$($NODE_BIN --version)" != "v24.18.0" ]]; then
+  printf 'blocked: expected Node v24.18.0, got %s\n' "$($NODE_BIN --version)" >&2
+  exit 3
+fi
+if [[ "$(uv --version)" != uv\ 0.11.17* ]]; then
+  printf 'blocked: expected uv 0.11.17, got %s\n' "$(uv --version)" >&2
+  exit 3
+fi
+
+export PATH="$(dirname "$NODE_BIN"):$PATH"
+export OBJGAUSS_NODE="$NODE_BIN"
+export UV_OFFLINE=1
+export OBJGAUSS_RUNTIME_OFFLINE=1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+npm run check
+./scripts/check-pr01d-audit
+
+mkdir -p "$OUTPUT_ROOT"
+WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/pilot.XXXXXX")"
+VENV="$WORK_ROOT/venv"
+ASSET_DIR="$WORK_ROOT/no-assets"
+PUBLISH_ROOT="$WORK_ROOT/output"
+
+cleanup() {
+  chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
+  rm -rf -- "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+mkdir "$ASSET_DIR" "$WORK_ROOT/xdg-cache" "$WORK_ROOT/mpl-cache" "$PUBLISH_ROOT"
+chmod 0555 "$ASSET_DIR"
+export UV_PROJECT_ENVIRONMENT="$VENV"
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev --no-install-project --no-build
+uv sync --project "$SIM_ROOT" --frozen --extra runtime --no-dev
+
+export OBJGAUSS_REPO_ROOT="$ROOT"
+export MS_ASSET_DIR="$ASSET_DIR"
+export XDG_CACHE_HOME="$WORK_ROOT/xdg-cache"
+export MPLCONFIGDIR="$WORK_ROOT/mpl-cache"
+unset MS_SKIP_ASSET_DOWNLOAD_PROMPT || true
+
+"$VENV/bin/python" -m unittest discover -s "$SIM_ROOT/tests" -p 'test_*.py'
+"$NODE_BIN" scripts/validate-pr01-document.mjs contracts/fixtures/pr02b/source-experiment.json
+
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+for ORDER in canonical reverse; do
+  if [[ "$ORDER" == "canonical" ]]; then
+    NAME="repeat-a"
+  else
+    NAME="repeat-b"
+  fi
+  "$VENV/bin/objgauss-pr01-cohort" \
+    --mode preflight \
+    --order "$ORDER" \
+    --output-root "$PUBLISH_ROOT/$NAME" \
+    --report "$PUBLISH_ROOT/$NAME/cohort-report.json" \
+    --spec contracts/fixtures/pr02b/pilot-spec.json \
+    --experiment contracts/fixtures/pr02b/source-experiment.json \
+    --lock sim/uv.lock \
+    --validator scripts/validate-pr01-document.mjs \
+    --node "$NODE_BIN" \
+    --source-commit "$SOURCE_COMMIT"
+
+  set +e
+  "$NODE_BIN" src/pr01/audit/cli.mjs \
+    --root "$PUBLISH_ROOT/$NAME" \
+    --manifest contracts/fixtures/pr02b/source-experiment.json \
+    --negative-cases generated/pr01d/negative-cases.json \
+    --output "$PUBLISH_ROOT/$NAME/source-audit.json" \
+    --human "$PUBLISH_ROOT/$NAME/source-audit.md" \
+    --checksums "$PUBLISH_ROOT/$NAME/checksums.sha256"
+  AUDIT_EXIT=$?
+  set -e
+  if [[ "$AUDIT_EXIT" -ne 0 && "$AUDIT_EXIT" -ne 2 && "$AUDIT_EXIT" -ne 3 && "$AUDIT_EXIT" -ne 4 ]]; then
+    printf 'invalid: source auditor returned internal exit %s\n' "$AUDIT_EXIT" >&2
+    exit 4
+  fi
+done
+
+mkdir "$PUBLISH_ROOT/freeze"
+set +e
+"$VENV/bin/objgauss-pr02-pilot" \
+  --spec contracts/fixtures/pr02b/pilot-spec.json \
+  --source-experiment contracts/fixtures/pr02b/source-experiment.json \
+  --grid contracts/fixtures/pr02b/hyperparameter-grid.json \
+  --lock sim/uv.lock \
+  --repeat-a "$PUBLISH_ROOT/repeat-a" \
+  --repeat-b "$PUBLISH_ROOT/repeat-b" \
+  --repeat-a-report "$PUBLISH_ROOT/repeat-a/cohort-report.json" \
+  --repeat-b-report "$PUBLISH_ROOT/repeat-b/cohort-report.json" \
+  --audit-a "$PUBLISH_ROOT/repeat-a/source-audit.json" \
+  --audit-b "$PUBLISH_ROOT/repeat-b/source-audit.json" \
+  --report "$PUBLISH_ROOT/freeze/pilot-report.json" \
+  --formal-data-spec "$PUBLISH_ROOT/freeze/formal-data-spec.json" \
+  --dynamics-experiment "$PUBLISH_ROOT/freeze/dynamics-experiment.json" \
+  --source-commit "$SOURCE_COMMIT"
+PILOT_EXIT=$?
+set -e
+
+if [[ -f "$PUBLISH_ROOT/freeze/dynamics-experiment.json" ]]; then
+  "$NODE_BIN" scripts/validate-pr01-document.mjs "$PUBLISH_ROOT/freeze/dynamics-experiment.json"
+  "$NODE_BIN" scripts/verify-pr02b-freeze.mjs \
+    "$PUBLISH_ROOT" \
+    "$PUBLISH_ROOT/freeze/verification-report.json" \
+    "$SOURCE_COMMIT"
+fi
+
+(
+  cd "$PUBLISH_ROOT"
+  find . -type f -print0 | sort -z | xargs -0 sha256sum
+) > "$WORK_ROOT/checksums.sha256"
+mv "$WORK_ROOT/checksums.sha256" "$PUBLISH_ROOT/checksums.sha256"
+
+rm -rf -- "$OUTPUT_ROOT/evidence"
+mv "$PUBLISH_ROOT" "$OUTPUT_ROOT/evidence"
+(
+  cd "$OUTPUT_ROOT/evidence"
+  sha256sum -c checksums.sha256 >/dev/null
+)
+cat "$OUTPUT_ROOT/evidence/freeze/pilot-report.json"
+exit "$PILOT_EXIT"

@@ -169,6 +169,7 @@ def group_config(
 def run_cohort(
     *,
     mode: str,
+    order: str = "canonical",
     output_root: Path,
     report_path: Path,
     spec_path: Path,
@@ -223,7 +224,7 @@ def run_cohort(
             )
             group_started = time.monotonic()
             result = run_group(
-                order="canonical",
+                order=order,
                 output_root=output_root,
                 config_path=config_path,
                 experiment_path=experiment_path,
@@ -275,6 +276,7 @@ def run_cohort(
         "report_version": "0.1.0",
         "report_kind": "objgauss.pr01e-cohort-run",
         "mode": mode,
+        "branch_order": order,
         "verdict": "supported",
         "experiment_id": spec["experiment_id"],
         "experiment_manifest_sha256": file_sha256(experiment_path),
@@ -351,6 +353,7 @@ def run_cohort(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("preflight", "formal"), required=True)
+    parser.add_argument("--order", choices=("canonical", "reverse"), default="canonical")
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--spec", type=Path, required=True)
@@ -367,6 +370,7 @@ def main() -> int:
     try:
         report = run_cohort(
             mode=args.mode,
+            order=args.order,
             output_root=args.output_root.resolve(),
             report_path=args.report.resolve(),
             spec_path=args.spec.resolve(),
