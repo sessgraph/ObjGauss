@@ -19,8 +19,8 @@
 | PR-02B 排障结果被误当 clean freeze | mitigated_local | 唯一验收脚本先检查 clean worktree；报告绑定 analyzer bytes、HEAD、repeat/audit 与冻结输入 hashes | `04ddb18` clean gate、21 checks 与 checksums supported；后续代码 HEAD 必须重跑 |
 | Pilot object 超出既定 weak-push 动作支持 | closed_negative | 不降低 `0.0014 m` 门；保留 rejected diagnostic，预注册前限制 pilot/formal catalog 质量范围并完整重跑 | `04ddb18` clean 两份 source audit supported |
 | Power proxy 与 error-reduction 量纲或声明边界漂移 | active | 使用相对 effect 异质性投影到 `δ`；源码/hash 固定；明确它不是 observed GNN seed variance | 量纲错误版 blocked 已保留；`04ddb18` clean freeze 通过，PR-02C 仍须报告真实 trial/seed variance |
-| PR-02 训练抢占桌面显示显存 | active | 12 GiB 进程 cap 与 1 GiB 实际空闲保留取更严者；不足即 blocked | `04ddb18` clean 16 MiB probe supported；PR-02C C0 dirty 真实 GPU 诊断也通过，仍待其 clean gate 并须在训练期持续监控 |
-| PR-02C learning runtime 意外携带 simulator 或在线依赖 | active_control_implemented | 独立精确 lock 仅含 Torch；AST/lock/import 三层拒绝 ManiSkill、SAPIEN、objgauss-sim；runtime 显式离线并由独立 verifier 复核 | C0 单元与 dirty 诊断通过；提交后的 clean-install acceptance 尚待运行 |
+| PR-02 训练抢占桌面显示显存 | active | 12 GiB 进程 cap 与 1 GiB 实际空闲保留取更严者；不足即 blocked | `04ddb18` 与 PR-02C `fc20023` clean 16 MiB probes 均 supported；仍须在训练期持续监控 |
+| PR-02C learning runtime 意外携带 simulator 或在线依赖 | mitigated_local | 独立精确 lock 仅含 Torch；AST/lock/import 三层拒绝 ManiSkill、SAPIEN、objgauss-sim；runtime 显式离线并由独立 verifier 复核 | `fc20023` clean-install、12 Python tests 与 14 independent checks supported；尚无远端 CI |
 | PR-02C 在 config/checkpoint 冻结前泄漏 final GT | active_control_frozen | Owner 已决定 PR-02C 只物化 train/validation；source CLI 与 trainer/HPO/selector 对 test/future fail closed | 延迟物化 decision 已冻结；仍需行为负例与 clean evidence 才能缓解 |
 | Action-free 与 action-conditioned 容量或训练预算不公平 | active_control_frozen | 共享 backbone/action encoder、参数量、updates、数据顺序、grid 和 seeds；HPO 对 validation groups/3 seeds 两级等权，缺失 config 不入选 | 公平性与 selection decisions 已冻结；parameter parity 与 24-task HPO/6-task formal audit 尚未实现 |
 | Variable-`Δt` rollout 静默变成按时刻独立 heads 或读取 executed/GT | active_control_frozen | 四区间共享 transition；显式 `Δt` 与 commanded schedule；初态后无 teacher forcing | Integrator decision 已冻结；仍需 shared-parameter、feature visibility 与长短区间行为测试 |

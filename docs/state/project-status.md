@@ -57,8 +57,9 @@ validation groups，12 个 test groups 到 PR-02E 前仅保留冻结 spec；lear
 按 12 validation groups group-first 后对全部 3 seeds 等权平均，缺失 seed 的 config 不可入选。
 ADR-006 已 accepted。C0 已建立独立 `learning/` package、精确 `uv.lock`、纯 PyTorch 离线
 runtime、simulator isolation、clean HEAD/lock/grid lineage guard、12 GiB cap/1 GiB display
-reserve probe、独立 verifier 和失败语义。12 个 Python 测试、4 个 Node freeze 测试与全库
-Node 门已在 dirty 开发树通过，真实 RTX 5060 Ti 诊断 probe 满足精确 CUDA runtime 和显示显存
-保留；因尚未提交，clean gate 按设计拒绝 dirty worktree，故当前状态是
-`c0_implemented_pending_clean_acceptance`。C0 `supported` 前不进入 loader/C1；formal cohort、
-模型、trainer、checkpoint、模型指标、Gaussian dynamics 和机器人控制仍未实现。
+reserve probe、独立 verifier 和失败语义。提交 `fc20023` 的 clean
+`./scripts/check-pr02c-runtime` 已在 Node `24.18.0` 下通过 77 项全库测试、12 个 Python 测试、
+14 项 verification checks 和真实 RTX 5060 Ti probe；最低观测空闲显存超过 1 GiB，training
+allocation cap 为 12 GiB。当前状态是 `c0_committed_local_supported`，尚无远端 CI；下一步是
+C1 train/validation cohort 与 fail-closed loader。formal cohort、模型、trainer、checkpoint、
+模型指标、Gaussian dynamics 和机器人控制仍未实现。

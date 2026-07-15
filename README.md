@@ -296,11 +296,11 @@ CPython `3.10.20`、`torch==2.13.0+cu130`、CUDA `13.0`、离线运行且不存�
 或 `objgauss-sim`，并独立复核 HEAD、package tree、lock、PR-02B grid、12 GiB cap 和至少
 1 GiB 的桌面显示显存保留。成功证据原子写入 ignored `generated/pr02c/runtime/`。
 
-当前状态是 `c0_implemented_pending_clean_acceptance`：12 个 Python 行为/失败测试、4 个 Node
-freeze 测试和全库 `npm run check` 已在 dirty 开发树上通过；真实 RTX 5060 Ti 的诊断 probe 也
-满足精确 CUDA runtime 与显示显存保留，但这些都不替代绑定最终提交的 clean gate。C0 只支持
-“独立纯 PyTorch runtime 可用”这一窄声明，不支持 trainer、模型性能、科学比较或 Gaussian
-dynamics 价值声明。
+当前状态是 `c0_committed_local_supported`：代码提交 `fc20023` 的 clean gate 在 Node
+`24.18.0` 下通过 77 项全库测试、12 个 Python 行为/失败测试和 14 项独立 verification checks；
+真实 RTX 5060 Ti probe 保留超过 1 GiB 空闲显存，并把训练 allocation cap 限为 12 GiB。C0 只
+支持“独立纯 PyTorch runtime 可用”这一窄声明，不支持 trainer、模型性能、科学比较或 Gaussian
+dynamics 价值声明；当前尚无远端 CI。
 
 ## 项目事实源
 

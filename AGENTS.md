@@ -9,8 +9,9 @@
 
 - 当前阶段：Demo A 的 PR-01 严格成对干预里程碑已经关闭；PR-02A `0.3.0` Contract 与 PR-02B
   pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C Trainer/Baselines 已获动作
-  授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已实现、正等待 clean HEAD
-  验收；loader、formal cohort、模型与 trainer 尚未实现。准确动态状态以 `docs/state/` 为准。
+  授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已由提交 `fc20023` 实现并通过
+  clean GPU 验收；loader、formal cohort、模型与 trainer 尚未实现。准确动态状态以
+  `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B

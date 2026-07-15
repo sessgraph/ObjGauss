@@ -26,14 +26,15 @@ teacher-force。
 Owner 已冻结 HPO config 聚合：每个 config 先对 12 validation groups group-first 等权，再对
 3 seeds 等权平均；缺失任一 seed 的 config 不可入选，平局按冻结 config ID。
 
-三个规划问题均已关闭。C0 已实现独立 `learning/` package、精确 uv lock、离线/无 simulator
-runtime、clean HEAD/lineage guard、GPU reserve probe、独立 verifier 与行为测试。dirty 开发树
-上的 12 个 Python 测试、4 个 Node 测试和全库 Node 门通过，真实 GPU 诊断满足 1 GiB 显存保留；
-这些不是 clean acceptance。
+三个规划问题均已关闭。C0 已由提交 `fc20023` 实现独立 `learning/` package、精确 uv lock、
+离线/无 simulator runtime、clean HEAD/lineage guard、GPU reserve probe、独立 verifier 与行为
+测试。`./scripts/check-pr02c-runtime` 在 Node `24.18.0` 下通过 77 项全库测试、12 个 Python
+测试、14 项独立 checks 和真实 RTX 5060 Ti probe，C0 为本地 `supported`。
 
-当前唯一开放动作是：Owner 授权提交 C0 相关代码与文档，然后在该 clean HEAD 运行
-`./scripts/check-pr02c-runtime`。在报告为 `supported` 前不进入 C1 loader/formal cohort；当前仍
-没有 formal cohort、loader、模型、trainer、checkpoint 或模型性能证据。
+当前下一动作是 C1：只物化并审计 48 train + 12 validation groups，建立 checksum/lineage
+loader，并证明 test、GT future、executed-action feature、缺失 commanded action 与跨 split
+identity 全部 fail closed。当前仍没有 formal cohort、loader、模型、trainer、checkpoint 或模型
+性能证据；C1 不得提前进入模型实现。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB
