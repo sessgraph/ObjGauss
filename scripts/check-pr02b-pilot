@@ -46,6 +46,12 @@ WORK_ROOT="$(mktemp -d "$OUTPUT_ROOT/pilot.XXXXXX")"
 VENV="$WORK_ROOT/venv"
 ASSET_DIR="$WORK_ROOT/no-assets"
 PUBLISH_ROOT="$WORK_ROOT/output"
+PUBLISH_URI="${PUBLISH_ROOT#"$ROOT/"}"
+
+if [[ "$PUBLISH_URI" == "$PUBLISH_ROOT" || "$PUBLISH_URI" == /* || "$PUBLISH_URI" == *"../"* ]]; then
+  printf 'invalid: PR-02B publish path is not repository-relative: %s\n' "$PUBLISH_URI" >&2
+  exit 4
+fi
 
 cleanup() {
   chmod -R u+w "$WORK_ROOT" 2>/dev/null || true
@@ -92,9 +98,9 @@ for ORDER in canonical reverse; do
     --root "$PUBLISH_ROOT/$NAME" \
     --manifest contracts/fixtures/pr02b/source-experiment.json \
     --negative-cases generated/pr01d/negative-cases.json \
-    --output "$PUBLISH_ROOT/$NAME/source-audit.json" \
-    --human "$PUBLISH_ROOT/$NAME/source-audit.md" \
-    --checksums "$PUBLISH_ROOT/$NAME/checksums.sha256"
+    --output "$PUBLISH_URI/$NAME/source-audit.json" \
+    --human "$PUBLISH_URI/$NAME/source-audit.md" \
+    --checksums "$PUBLISH_URI/$NAME/checksums.sha256"
   AUDIT_EXIT=$?
   set -e
   if [[ "$AUDIT_EXIT" -ne 0 && "$AUDIT_EXIT" -ne 2 && "$AUDIT_EXIT" -ne 3 && "$AUDIT_EXIT" -ne 4 ]]; then
