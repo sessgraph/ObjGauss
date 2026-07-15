@@ -36,12 +36,15 @@ C1 已提交只物化 48 train + 12 validation groups 的 source producer、chec
 60 groups / 300 branches、0 failed attempts；producer、loader 与 16 项独立 checks 的 data
 index 均为 `2501ebc2…17a81b5`，C1 为本地 `supported`。
 
-当前开放动作是完成 C2 clean acceptance。C2 已实现 validation-only sanitized bundle、copy-state、
-constant-velocity、独立 Node verifier、canonical/reverse repeat 和 clean gate；基于既有 ignored C1
-source 的 dirty diagnostic 生成 60 branches / 120 predictions，18 项 checks 全部通过，semantic
-index 为 `17488a15…7c647`。它尚未提交，不能替代 clean HEAD acceptance；下一步是提交后运行
-`./scripts/check-pr02c-baselines`。当前仍没有 test source/prediction、learned model、trainer、HPO、
-checkpoint 或模型性能证据。
+C2 已由提交 `9ea2b92` 实现并通过 clean acceptance：C1 重建 60 groups / 300 branches / 0
+failures，data index `970b9359…2e745` 与 16 项 checks supported；C2 在 60 validation branches
+发布 120 predictions，18 项 checks、canonical/reverse semantic index `17488a15…7c647`、corruption
+mutation rejection 和 checksums 均 supported。
+
+当前开放动作是 C3 learned arms/trainer：实现共享最小 Object GNN 的 action-free 与
+action-conditioned 两个 arms、variable-`Δt` open-loop rollout、parameter/update/data-order parity、
+trial/attempt/checkpoint lineage，并先通过 CPU tiny fixture 与宿主 GPU golden clean repeat。当前
+仍没有 test source/prediction、HPO 结果、checkpoint、模型性能或科学比较证据。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB

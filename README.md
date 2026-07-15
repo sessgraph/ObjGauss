@@ -334,13 +334,13 @@ contract、payload/artifact checksum、两种 baseline 数学、lineage、final/
 初态不变性与 canonical/reverse repeat，并必须拒绝被篡改的 prediction；成功证据原子发布到 ignored
 `generated/pr02c/baselines/`。
 
-当前状态是 `c2_implemented_pending_clean_acceptance`。基于 C1 已有 ignored source 的 dirty
-diagnostic 已覆盖 12 validation groups / 60 branches / 120 predictions，18 项独立 checks 全部通过，
-canonical/reverse semantic index 均为 `17488a15…7c647`；篡改单份 prediction 后 verifier 以
-exit 4 拒绝，并同时标记 contract、payload checksum、constant-velocity 数学和 reverse repeat
-失败。这不是 clean HEAD acceptance，不能提升为本地正式 `supported`；C2 仍待提交后运行上述
-gate。当前没有 action-free/action-conditioned learned model、trainer、HPO、checkpoint、test
-prediction 或科学比较。
+当前状态是 `c2_committed_local_supported`。代码承载 SHA `9ea2b92` 的 clean gate 重建 C1 的
+60 groups / 300 branches / 0 failures，并对 data index `970b9359…2e745` 完成 16 项检查；随后在
+12 validation groups / 60 branches 上发布 120 份 deterministic predictions，18 项独立 checks
+全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`。篡改单份 prediction 后
+verifier 以 exit 4 拒绝，并同时标记 contract、payload checksum、constant-velocity 数学和
+reverse repeat 失败。当前没有远端 CI，也没有 action-free/action-conditioned learned model、
+trainer、HPO、checkpoint、test prediction 或科学比较；下一切片是 C3 learned arms/trainer。
 
 ## 项目事实源
 

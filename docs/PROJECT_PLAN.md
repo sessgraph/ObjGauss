@@ -5,9 +5,9 @@
 > 提交，但尚未取得远端 CI 证据；PR-02B 已提交，并在代码承载 SHA `04ddb18` 上完成 clean
 > acceptance，pilot/data freeze 为本地 `supported`；PR-02C 已获动作授权，提交 `fc20023` 的
 > C0 runtime gate 已通过 clean GPU 验收，代码承载 SHA `adb1a62` 的 C1 data boundary clean
-> gate 也已通过；C2 deterministic baselines 已实现并通过 dirty diagnostic，尚待提交后运行
-> clean acceptance
-> 版本：0.24
+> gate 也已通过；提交 `9ea2b92` 的 C2 deterministic baselines 已通过 clean acceptance，下一切片
+> 为 C3 learned arms/trainer
+> 版本：0.25
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -97,10 +97,11 @@
 >   Node/Python/Torch/CUDA runtime 上得到 `supported`。C1 train/validation source producer、
 >   checksum/lineage loader 与独立 verifier 已提交；代码承载 SHA `adb1a62` 的 clean gate 生成
 >   60 groups / 300 branches、0 failed attempts，16 项独立 checks 与三方 data index
->   `2501ebc2…17a81b5` 一致并得到 `supported`。C2 已实现 sanitized validation bundle、copy-state、
->   constant-velocity、120 份 raw predictions、独立 18-check verifier 与 clean gate；dirty diagnostic
->   的 canonical/reverse semantic index 为 `17488a15…7c647`，但因尚未提交和 clean 验收，只能记为
->   `c2_implemented_pending_clean_acceptance`。仍未建立 learned model、trainer、checkpoint 或模型结果。
+>   `2501ebc2…17a81b5` 一致并得到 `supported`。C2 已由提交 `9ea2b92` 实现 sanitized validation
+>   bundle、copy-state、constant-velocity、120 份 raw predictions、独立 18-check verifier 与 clean
+>   gate；正式 clean acceptance 的 C1 data index 为 `970b9359…2e745`，C2 canonical/reverse semantic
+>   index 为 `17488a15…7c647`，状态是 `c2_committed_local_supported`。仍未建立 learned model、
+>   trainer、checkpoint 或模型结果。
 > - `decision`：PR-02C 只物化 48 train + 12 validation groups；12 个 final test groups 在
 >   PR-02E 配置/checkpoint 冻结前只保留 PR-02B spec，不生成 episode、trajectory 或 GT future。
 >   PR-02C 出现任何 test 数据产物均为 `invalid`，不能只依赖 loader 权限补救。
@@ -708,7 +709,7 @@ SHA-256 为 `47ad53c6…944cc`。其唯一权威入口仍是 `./scripts/check-pr
 
 ### PR-02C 授权后实施计划
 
-PR-02C 当前状态为 `c2_implemented_pending_clean_acceptance`，其唯一假设是独立 clean GPU runtime 能在
+PR-02C 当前状态为 `c2_committed_local_supported`，其唯一假设是独立 clean GPU runtime 能在
 不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，可复现地产生
 四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。C0 只支持该假设的
 runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比较仍由 PR-02D/PR-02E 完成。
@@ -731,8 +732,9 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
 4. C2 单独实现 copy-state 与 constant-velocity 两个无训练 baseline：只消费 sanitized validation
    bundle，不读取 source trajectory、future GT、executed action 或 test；发布 120 份 contract-valid
    predictions，并由独立 Node verifier 重算 source projection、数学、checksum/lineage、final
-   isolation 与 canonical/reverse repeat。实现和 dirty diagnostic 已完成；只有提交后运行
-   `./scripts/check-pr02c-baselines` 才能把 C2 提升为本地 `supported`。
+   isolation 与 canonical/reverse repeat。提交 `9ea2b92` 的 clean gate 已以 120 predictions、18
+   checks、corruption mutation rejection 和 checksums 得到 `supported`；该结果不支持 learned
+   model 或科学性能声明。
 5. C3 再实现 action-free 与 action-conditioned 两个 learned arms；二者共享 backbone、四区间
    variable-`Δt` transition、参数量、updates、数据顺序、grid 和 seeds，不得回改 C2 baseline
    语义或把其输出当作模型性能结论。
@@ -1239,7 +1241,7 @@ Owner 选择。
    rollout 与 HPO 两级等权聚合均已冻结。C0 runtime/contract gate 已由 `fc20023` 实现并在
    clean GPU 门得到 `supported`；C1 train/validation source 与 fail-closed loader 已提交，代码
    承载 SHA `adb1a62` 的 `./scripts/check-pr02c-data` 以 60 groups / 300 branches、0 failures 和
-   16 项独立 checks 得到 `supported`。C2 deterministic baselines 已实现并用既有 ignored C1
-   evidence 完成 60-branch/120-prediction/18-check dirty diagnostic；下一步是提交本切片并运行
-   `./scripts/check-pr02c-baselines` 的 clean acceptance。当前没有 learned model、trainer、
-   checkpoint、test prediction 或模型性能证据。
+   16 项独立 checks 得到 `supported`。C2 deterministic baselines 已由提交 `9ea2b92` 实现并通过
+   clean acceptance：60 validation branches、120 predictions、18 checks、canonical/reverse repeat、
+   corruption mutation 与 checksums 均通过。下一步是 C3 action-free/action-conditioned learned
+   arms 与 trainer；当前没有 checkpoint、test prediction 或模型性能证据。

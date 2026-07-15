@@ -11,8 +11,9 @@
   pilot/data freeze 均已在本地实现、通过各自项目门并提交；PR-02C Trainer/Baselines 已获动作
   授权，ADR-006 规划决策已冻结，C0 独立 runtime/contract gate 已由提交 `fc20023` 实现并通过
   clean GPU 验收；C1 train/validation source 与 fail-closed loader 已提交并通过 clean HEAD
-  验收；C2 copy-state/constant-velocity deterministic baselines 已实现但尚未提交或通过 clean
-  acceptance。Learned model 与 trainer 尚未实现。准确动态状态以 `docs/state/` 为准。
+  验收；C2 copy-state/constant-velocity deterministic baselines 已由提交 `9ea2b92` 实现并通过
+  clean acceptance。下一切片是 C3 learned arms/trainer，尚未实现。准确动态状态以
+  `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B

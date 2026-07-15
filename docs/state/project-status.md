@@ -70,12 +70,12 @@ action 不进入 feature。代码承载 SHA `adb1a62` 的 clean gate 生成 48 t
 300 branches、0 failed attempts，producer、loader 与 16 项独立 checks 对 data index
 `2501ebc2…17a81b5` 一致。C1 状态保持 `c1_committed_local_supported`；未物化 test。
 
-C2 已实现独立 sanitized validation model-input bundle、copy-state 与 constant-velocity 数学、
+C2 已由提交 `9ea2b92` 实现独立 sanitized validation model-input bundle、copy-state 与 constant-velocity 数学、
 canonical payload checksum、120 份 `0.3.0` prediction publication、canonical/reverse repeat、
-独立 Node source/contract/math/lineage/final-isolation verifier 和 clean gate。基于既有 ignored C1
-source 的 dirty diagnostic 覆盖 12 validation groups / 60 branches / 120 predictions，18 项 checks
-全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`；单 prediction corruption
-mutation 以 exit 4 被 contract/checksum/math/repeat 四层拒绝。由于当前改动尚未提交且 gate 要求
-clean HEAD，这不是正式 acceptance；PR-02C 当前状态为
-`c2_implemented_pending_clean_acceptance`。仍没有 learned model、trainer、HPO、checkpoint、test
-prediction、模型指标、Gaussian dynamics 或机器人控制。
+独立 Node source/contract/math/lineage/final-isolation verifier 和 clean gate。正式 clean acceptance
+绑定 SHA `9ea2b92`：C1 重建 60 groups / 300 branches / 0 failures，data index
+`970b9359…2e745` 与 16 checks supported；C2 覆盖 12 validation groups / 60 branches / 120
+predictions，18 checks 全部通过，canonical/reverse semantic index 均为 `17488a15…7c647`；单
+prediction corruption mutation 以 exit 4 被 contract/checksum/math/repeat 四层拒绝。PR-02C 当前
+状态为 `c2_committed_local_supported`，尚无远端 CI。仍没有 learned model、trainer、HPO、
+checkpoint、test prediction、模型指标、Gaussian dynamics 或机器人控制；下一切片是 C3。
