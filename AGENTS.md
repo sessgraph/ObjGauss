@@ -13,9 +13,10 @@
   clean GPU 验收；C1 train/validation source 与 fail-closed loader 已提交并通过 clean HEAD
   验收；C2 copy-state/constant-velocity deterministic baselines 已由提交 `9ea2b92` 实现并通过
   clean acceptance。C3 learned arms/trainer 已由提交 `4498bd6` 实现并通过完整 clean acceptance：
-  CPU tiny、宿主 GPU canonical/reverse golden、24 项独立检查与负例均通过。C6 已建立冻结
-  manifest、paired runner、独立 selector/verifier、CPU workflow 与 clean gate，但 24-task HPO、
-  formal training 与 final test 尚未运行。准确动态状态以 `docs/state/` 为准。
+  CPU tiny、宿主 GPU canonical/reverse golden、24 项独立检查与负例均通过。C6 已由提交
+  `080d844` 建立冻结 manifest、paired runner、独立 selector/verifier、CPU workflow 与 clean
+  gate；远端 CPU 和本地 24-task HPO clean acceptance 均 supported，两个 learned arms 的 config
+  mapping 已冻结。C7 formal training 与 final test 尚未运行。准确动态状态以 `docs/state/` 为准。
 - 当前已完成的证据底座：PR-00 `0.1.0` contract、PR-01 `0.2.0` sibling evidence contract
   family、隔离 simulator runtime、原子 writer、独立 audit、正式 cohort、无 RGB 五联 Demo、
   机器报告和远端验收，以及本地 supported 的 PR-02A `0.3.0` contract family 与 PR-02B
@@ -26,8 +27,8 @@
   Gaussian 是否进入 dynamics 核心；准确队列以 docs/PROJECT_PLAN.md 为准。
 - 当前工作区已有 Stage-0 `viewer/`、`0.1.0`/`0.2.0`/`0.3.0` JSON Schema、Node/npm 锁文件、
   synthetic producer、独立 evaluator、Web consumer、行为测试和 GitHub Actions workflow；C6
-  已增加最小 Object GNN trainer 的冻结 HPO runner/selector，但仍没有提交的训练数据、正式冻结
-  checkpoint、HPO 或 final-test 结果。
+  已增加最小 Object GNN trainer 的冻结 HPO runner/selector。本地 ignored C6 evidence 已生成，
+  但 Git 中仍没有训练数据/输出、正式冻结 checkpoint 或 final-test 结果。
 - Owner 已明确要求 Stage-0 不使用 notebook，而是直接看到渲染后的 3D Gaussian；已批准把
   一个固定 `.splat` 下载到 ignored `data/` 并构建 WebGL2 页面。准确来源、大小、哈希与
   声明边界以 REFERENCES.md 为准，该授权不延伸到训练数据或其他 3DGS 资产。

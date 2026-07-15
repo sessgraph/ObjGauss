@@ -87,13 +87,17 @@ validation-only golden checkpoint selection、`0.3.0` trial/attempt/checkpoint/p
 的 24/24 checks 通过，semantic index 为 `709f6f76…d3db`，两 arm 各 35,734 参数，峰值显存
 68,277,760 bytes，最低空闲显存 15,633,416,192 bytes；test split 与参数账本 mutation 均以 exit 4
 被拒绝，发布目录的 24-entry artifact checksum index 已复核。`4498bd6` 与状态提交 `1c0d6ed`
-已推送，但远端尚无 PR-02C CPU workflow，因此 C3 准确状态为
-`c3_pushed_gpu_local_supported`。
+已推送；后继提交 `080d844` 的远端 PR-02C CPU run `29422872955` 也已成功，因此 C3 准确状态为
+`c3_pushed_remote_cpu_supported_gpu_local_supported`。
 
 C6 的唯一机器执行 contract 已冻结在 `learning/hpo-manifest.json`：2 learned arms × 4 configs ×
 3 seeds 形成 24 个 tasks / 12 个 fairness pairs；clean runner commit 只生成一次共享
 `hpo_data_index`，独立 selector 按 ADR-006 为每个 arm 选择一个 config，并要求 canonical/reverse
 输入顺序重放一致。Paired runner、独立 selector/verifier、PR-02C CPU workflow、clean gate 与
-mutation tests 已实现，提交前完整 Node 门与 53 项 learning tests 已通过；implementation 尚未
-push/取得远端 CPU 证据，也未运行 24-task 验收。当前没有 HPO、正式冻结 checkpoint、test
-prediction、模型指标、Gaussian dynamics 或机器人控制证据。
+mutation tests 已由 `080d844` 实现并推送，远端 run `29422872955` 成功。同一 clean commit 的
+本地 HPO 完成 24/24 tasks、12/12 pairs、0 retry、20/20 independent checks；共享
+`hpo_data_index` hash 为 `a7d24285…2a5615`，selection semantic hash 为 `33679c22…6d6d7f`，
+唯一双 arm mapping 为 `action_free → hpo-h064-lr0p0003`、
+`action_conditioned → hpo-h128-lr0p0010`。C6 为 `c6_config_frozen_supported`；该状态只冻结配置
+映射，不支持模型性能。当前没有 C7 正式冻结 checkpoint、test prediction、Gaussian dynamics 或
+机器人控制证据，PR-02C 仍未关闭。

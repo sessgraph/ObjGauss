@@ -354,22 +354,22 @@ mean aggregation 与两层 residual head。Action-conditioned 只向 target obje
 encoder 与 learned mask token。两 arm 复用同一四区间 variable-`Δt` transition，只在初态
 teacher-force，并保持参数量、updates、数据顺序、grid 和 seed 公平。
 
-当前 C3 运行证据状态是 `c3_pushed_gpu_local_supported`。代码承载 SHA `4498bd6` 的
+当前 C3 运行证据状态是 `c3_pushed_remote_cpu_supported_gpu_local_supported`。代码承载 SHA `4498bd6` 的
 `./scripts/check-pr02c-trainer` 从 clean checkout 重建 C1 的 48 train + 12 validation groups / 300
 branches / 0 failures，data index 为 `dd5994a3…1a30`；C2 的 120 predictions 与 18 checks 继续
 supported。C3 CPU tiny 与宿主 GPU canonical/reverse golden 由独立 verifier 完成 24/24 checks，
 semantic index 为 `709f6f76…d3db`，每 arm 35,734 个参数，峰值显存 68,277,760 bytes，最低空闲
 显存 15,633,416,192 bytes；test split 与参数公平性账本 mutation 均以 exit 4 被拒绝。Machine
 report SHA-256 为 `096d244e…9869`，verification report 为 `e26512fc…bb40`；发布目录共 25 个
-文件，其中 24 项 artifact checksum index 已复核。没有运行 HPO、formal training 或 final test，
-也没有冻结正式 checkpoint 或模型性能/科学比较结论。
+文件，其中 24 项 artifact checksum index 已复核。该 C3 gate 本身没有运行 HPO、formal training
+或 final test，也没有冻结正式 checkpoint 或模型性能/科学比较结论；后继 C6 状态见下文。
 
-C3 代码与状态提交 `4498bd6`、`1c0d6ed` 已推送；因该远端 SHA 尚无 PR-02C CPU workflow，准确状态为
-`c3_pushed_gpu_local_supported`，旧 PR-00/PR-01 workflow 不计作 C3 CPU 证据。C6 的唯一机器
+C3 代码与状态提交 `4498bd6`、`1c0d6ed` 已推送；提交 `080d844` 新增的 PR-02C CPU workflow
+已在同一 trainer 后继树上通过，旧 PR-00/PR-01 workflow 不计作 C3 CPU 证据。C6 的唯一机器
 执行 contract 已冻结在 [`learning/hpo-manifest.json`](learning/hpo-manifest.json)：24 个 tasks
 组成 12 个 fairness pairs，在 clean runner commit 下共同消费一次生成的 `hpo_data_index`，独立
-selector 为两个 learned arms 各冻结一个 config。C6 runner/selector 已实现，提交前完整 CPU 门
-已通过，但尚未 push/取得远端 CPU 证据，也尚未从 clean runner commit 运行 24-task 验收。
+selector 为两个 learned arms 各冻结一个 config。`trainer_contract_commit` 为 `4498bd6`，C6
+contract 提交为 `28d1b39`，runner/workflow/HPO data build 提交均为 `080d844`；三者均已推送。
 
 ### 验证 PR-02C C6 HPO/Config Freeze
 
@@ -377,13 +377,28 @@ selector 为两个 learned arms 各冻结一个 config。C6 runner/selector 已�
 ./scripts/check-pr02c-hpo
 ```
 
-C6 clean gate 会在当前 clean commit 下只生成一次 48 train + 12 validation 的共享
+C6 clean gate 已在 clean `080d844` 下只生成一次 48 train + 12 validation 的共享
 `hpo-data-index.json`，随后以 12 个 fairness pairs 锁步运行 24 个冻结 tasks。独立 selector 只读
 task artifacts，按 validation group-first、三个 seeds 等权与精确分数平局时的 config ID 字典序，
 为 `action_free` 和 `action_conditioned` 各冻结一个 config；canonical/reverse 只重放 selector
 输入顺序。远端 `.github/workflows/pr02c-cpu.yml` 只运行 contract、CPU tiny 和 mutations，不运行
-GPU HPO。当前 implementation commit 只承载代码与 CPU 证据，尚未从该 clean commit 完成
-24-task 验收，因此仍没有 selected config、formal checkpoint、test prediction 或模型性能结论。
+GPU HPO。正式 C6 结果为 `supported`：
+
+- 24/24 tasks、12/12 fairness pairs、24 attempts、0 retry，产生 1440 份 validation predictions；
+- `action_free → hpo-h064-lr0p0003`，`action_conditioned → hpo-h128-lr0p0010`；action-free 的四个
+  score 精确相等，按预注册 `config_id` 字典序确定性破平局，不代表唯一全局最优配置；
+- canonical/reverse 的 selected-config 和 selection-report 文件 hashes 分别一致为
+  `7aeaa81b…42b4a`、`fd5340c2…221fc`，selection semantic hash 为 `33679c22…6d6d7f`；
+- `hpo-data-index` 为 `a7d24285…2a5615` 且 `build_count=1`；20/20 verifier checks supported，
+  verification report 为 `00de5f17…11af9`，1543-entry checksum index 为 `cc724fe4…8caf7`；
+- runner/selector test 拒绝、sealed-config mutation 均以 exit 4 失败关闭，fairness mutation 以
+  exit 2 得到 `rejected`；GPU 账本为 0.828 小时、峰值 80,088,576 bytes、最低空闲显存
+  15,636,037,632 bytes；
+- 远端 CPU workflow 文件 hash `c524198a…d1a7`，run `29422872955` / job `87377583903` 在
+  `080d844` 上成功。
+
+C6 只冻结上述双配置映射。HPO checkpoints 没有发布 formal checkpoint manifests，也没有运行
+C7、materialize test、产生模型性能或科学比较结论；PR-02C 整体仍未关闭。
 
 ## 项目事实源
 

@@ -7,8 +7,9 @@
 > C0 runtime gate 已通过 clean GPU 验收，代码承载 SHA `adb1a62` 的 C1 data boundary clean
 > gate 也已通过；提交 `9ea2b92` 的 C2 deterministic baselines 已通过 clean acceptance；提交
 > `4498bd6` 的 C3 learned arms/trainer 已通过 CPU tiny、宿主 GPU golden repeat 与完整 clean
-> acceptance；下一门是 C6 HPO/config freeze，但尚未运行
-> 版本：0.27
+> acceptance；提交 `080d844` 的 C6 HPO/config freeze 已通过远端 CPU 与本地 clean GPU 门；
+> 下一门是 C7 formal training/checkpoint freeze
+> 版本：0.28
 > 日期：2026-07-15
 > 上位需求：`PRD.md`
 >
@@ -714,8 +715,10 @@ C3 现已通过完整 clean acceptance。详细取舍与失败账本见
 
 ### PR-02C 授权后实施计划
 
-PR-02C 当前状态为 `c6_spec_frozen`；C3 的两个提交已推送，宿主 GPU golden 仍绑定 `4498bd6`，
-但远端尚无 PR-02C CPU workflow，因此 C3 只可写为 `c3_pushed_gpu_local_supported`。PR-02C 的
+PR-02C 当前状态为 `c6_config_frozen_supported_c7_pending`；C3 的两个提交已推送，宿主 GPU
+golden 仍绑定 `4498bd6`，后继提交 `080d844` 的远端 PR-02C CPU workflow 已成功，因此 C3 为
+`c3_pushed_remote_cpu_supported_gpu_local_supported`。C6 的同一 clean runner commit 已完成
+24-task HPO 并冻结双 arm config mapping。PR-02C 的
 唯一假设是独立 clean GPU runtime 能在
 不读取 final GT、保持两个 learned arms 公平且不突破资源/重试规则的条件下，可复现地产生
 四个 arms 的 contract-valid、checksum-valid、lineage-complete artifacts。C0 只支持该假设的
@@ -747,15 +750,18 @@ runtime 前提，不裁决 action-conditioned 是否胜过 baselines；科学比
    checkpoint semantic audit 与 `0.3.0` lineage。未回改 C2 baseline 语义，也不把 golden 输出
    当作模型性能结论。
 6. 提交 `4498bd6` 的 CPU tiny fixture 与宿主 GPU golden clean repeat 已通过；24 项独立 checks、
-   semantic repeat、test-split 拒绝、参数账本 mutation 和资源门均 supported。下一门是 24 个
-   HPO tasks；当前尚未运行，也没有用 golden 结果冻结 config。
+   semantic repeat、test-split 拒绝、参数账本 mutation 和资源门均 supported。后继提交
+   `080d844` 的远端 PR-02C CPU workflow 也已通过，C3 状态为
+   `c3_pushed_remote_cpu_supported_gpu_local_supported`。
 7. C6 机器 contract 已在 [`learning/hpo-manifest.json`](../learning/hpo-manifest.json) 冻结：
    `2 learned arms × 4 configs × 3 seeds = 24 tasks`，组成 12 个 fairness pairs；C3 data index
    只作 reference，clean runner commit 必须只生成一次共享 `hpo_data_index`。独立 selector 按
    ADR-006 为两个 arms 各冻结一个 config，并做 canonical/reverse 输入顺序重放。Paired runner、
-   独立 selector/verifier、CPU workflow、mutation tests 与 clean gate 已实现，提交前完整 CPU 门
-   已通过；implementation commit push 并通过远端 CPU 后，才从同一 clean commit 运行本地
-   24-task HPO。当前尚未运行 HPO。
+   独立 selector/verifier、CPU workflow、mutation tests 与 clean gate 已由提交 `080d844` 实现。
+   远端 CPU run `29422872955` 成功；同一 clean commit 的本地 HPO 完成 24/24 tasks、12/12
+   fairness pairs、0 retry 与 20/20 verifier checks，唯一映射为
+   `action_free → hpo-h064-lr0p0003`、`action_conditioned → hpo-h128-lr0p0010`。C6 状态为
+   `c6_config_frozen_supported`，该 verdict 不代表模型性能或全局唯一配置。
 8. 对两个 selected configs × 3 seeds 从头运行 6 个 formal training tasks，冻结每 seed 的
    validation-selected checkpoint、train/validation predictions、machine report 和 checksums。
 
@@ -1263,7 +1269,9 @@ Owner 选择。
    通过完整 clean acceptance：C1 data index `dd5994a3…1a30`，CPU tiny 与 GPU canonical/reverse
    golden 的 24 checks supported，semantic index 为 `709f6f76…d3db`，test split 和公平性账本
    mutation 均被拒绝；`4498bd6` 与状态提交 `1c0d6ed` 已推送。C6 的 task/pair/selector contract
-   已冻结为 `learning/hpo-manifest.json`；runner、独立 selector/verifier、CPU workflow 与负例已
-   实现，提交前完整 CPU 门已通过。下一步 push implementation 并取得远端 CPU 证据，然后才从
-   同一 clean commit 运行 24-task HPO。当前没有 HPO、正式冻结 checkpoint、test prediction 或
-   模型性能证据。
+   已由 `28d1b39` 冻结为 `learning/hpo-manifest.json`；提交 `080d844` 的 runner、独立
+   selector/verifier、CPU workflow 与负例已推送，远端 run `29422872955` 成功。本地 clean HPO
+   完成 24 tasks / 12 pairs / 0 retry、20 checks，selection semantic hash `33679c22…6d6d7f`，
+   双配置映射已冻结。下一步严格进入 C7：按两个 selected configs × 3 seeds 从头进行 train-only
+   formal training 与 validation checkpoint selection。当前仍没有正式冻结 checkpoint、test
+   prediction 或模型性能证据。

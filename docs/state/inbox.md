@@ -41,18 +41,17 @@ failures，data index `970b9359…2e745` 与 16 项 checks supported；C2 在 60
 发布 120 predictions，18 项 checks、canonical/reverse semantic index `17488a15…7c647`、corruption
 mutation rejection 和 checksums 均 supported。
 
-C3 clean acceptance 已关闭。提交 `4498bd6` 的共享 minimal Object GNN、action-free 与
+C3 与 C6 clean acceptance 已关闭。提交 `4498bd6` 的共享 minimal Object GNN、action-free 与
 action-conditioned 两 arm、variable-`Δt` open-loop rollout、parameter/update/data-order parity、
 trial/attempt/checkpoint lineage 和独立 verifier 已通过 `./scripts/check-pr02c-trainer`。完整门重建
 C1 的 60 groups / 300 branches / 0 failures 与 C2 的 120 predictions；C3 CPU tiny、GPU
 canonical/reverse golden、24/24 checks、test-split rejection、参数账本 mutation 和 checksums 均
-supported，semantic index 为 `709f6f76…d3db`。当前开放动作是 C6 的 24-task HPO/config freeze；
-`4498bd6` 与 `1c0d6ed` 已推送，但尚无 PR-02C CPU workflow。C6 的 24 task IDs、12 pair IDs、
-config IDs、selector、retry、资源和输出 contract 已冻结为 `learning/hpo-manifest.json`。Paired
-runner、独立 selector/verifier、CPU workflow、clean gate 与 mutation tests 已实现，提交前完整
-CPU 门已通过；当前开放动作是 push implementation 并取得远端 CPU 证据，然后在同一 clean
-runner commit 只生成一次共享 `hpo_data_index` 并运行 24 tasks。当前仍没有 test
-source/prediction、正式冻结 checkpoint、模型性能或科学比较证据。
+supported，semantic index 为 `709f6f76…d3db`。C6 contract/runner 提交 `28d1b39`/`080d844` 已推送；
+远端 CPU run `29422872955` 成功。本地 clean C6 只生成一次 `hpo_data_index`，完成 24/24 tasks、
+12/12 fairness pairs、0 retry、20/20 checks，并冻结映射 `action_free → hpo-h064-lr0p0003`、
+`action_conditioned → hpo-h128-lr0p0010`；selection semantic hash 为 `33679c22…6d6d7f`。
+当前开放动作是 C7 的 6 个 train-only formal tasks 与 validation checkpoint selection。当前仍没有
+test source/prediction、正式冻结 checkpoint、模型性能或科学比较证据；PR-02C 整体未关闭。
 
 已关闭：Contract 采用 `0.2.0` 四层记录；runtime 使用隔离 `sim` optional extra；本地 clean-venv
 安装与真实五分支 smoke 可复现；preflight 阈值与正式资源预算已冻结，48-group cohort 已通过；Demo 采用无 RGB
